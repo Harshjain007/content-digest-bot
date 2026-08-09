@@ -1,0 +1,21 @@
+# Secrets — never commit. Use .env.example as the template.
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# data/data.json is intentionally tracked — it is what the site publishes.
+# resources.json / learnings.json are the bot's working store.
+data/resources.json
+data/learnings.json
+
+# OS
+.DS_Store
+
+# Bot runtime logs
+bot.log
+bot.out.log
+bot.err.log

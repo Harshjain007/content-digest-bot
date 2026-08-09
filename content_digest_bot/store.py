@@ -1,0 +1,145 @@
+"""Local JSON knowledge store with dedup + site data generation.
+
+Data lives in data/:
+  data/resources.json   - tool/repo entries
+  data/learnings.json    - upskilling/article entries
+  data/data.json         - combined, for the HTML viewer (site/index.html)
+
+Dedup: a lightweight local check (no extra API). We compute a keyword/title
+signature and skip adding an entry if a stored one is too similar.
+"""
+import json
+import logging
+import os
+import re
+from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(REPO_ROOT, "data")
+RESOURCES = os.path.join(DATA_DIR, "resources.json")
+LEARNINGS = os.path.join(DATA_DIR, "learnings.json")
+COMBINED = os.path.join(DATA_DIR, "data.json")
+COMBINED_JS = os.path.join(DATA_DIR, "data.js")
+SITE_DIR = os.path.join(REPO_ROOT, "site")
+SITE_HTML = os.path.join(SITE_DIR, "index.html")
+SITE_TEMPLATE = os.path.join(SITE_DIR, "template.html")
+
+os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def _load(path):
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _save(path, items):
+    with open(path, "w") as f:
+        json.dump(items, f, indent=2, ensure_ascii=False)
+
+
+def _keywords(text):
+    text = (text or "").lower()
+    # strip punctuation, keep words >=4 chars, drop very common ones
+    stop = {"this", "that", "with", "from", "your", "what", "when", "have",
+            "will", "they", "their", "about", "which", "those", "these", "into",
+            "than", "then", "them", "are", "was", "were", "been", "being"}
+    words = re.findall(r"[a-z0-9_+#.-]{4,}", text)
+    return {w for w in words if w not in stop}
+
+
+def _similarity(a, b):
+    ka, kb = _keywords(a), _keywords(b)
+    if not ka or not kb:
+        return 0.0
+    return len(ka & kb) / len(ka | kb)
+
+
+def _is_duplicate(new_entry, existing, fields=("title", "description", "how this works", "takeAways")):
+    """Return True if new_entry is too similar to an existing one."""
+    for ex in existing:
+        score = max(_similarity(new_entry.get(f, ""), ex.get(f, ""))
+                    for f in fields if new_entry.get(f) and ex.get(f))
+        if score >= 0.55:
+            return True
+    return False
+
+
+def add_resource(entry):
+    """Add a tool/repo entry. Returns (added: bool, reason: str)."""
+    items = _load(RESOURCES)
+    # dedup by title OR url
+    for ex in items:
+        if entry.get("title") and ex.get("title") == entry.get("title"):
+            return False, "already have a tool with this name"
+        if entry.get("links", {}).get("github") and \
+           ex.get("links", {}).get("github") == entry["links"]["github"]:
+            return False, "already have this repo"
+    if _is_duplicate(entry, items):
+        return False, "too similar to an existing resource"
+    entry["_added"] = datetime.now(timezone.utc).isoformat()
+    items.append(entry)
+    _save(RESOURCES, items)
+    _regen()
+    return True, "added"
+
+
+def add_learning(entry):
+    """Add a learning/article entry. Returns (added: bool, reason: str)."""
+    items = _load(LEARNINGS)
+    if entry.get("links") and entry["links"] in [e.get("links") for e in items]:
+        return False, "already have this article"
+    if _is_duplicate(entry, items, fields=("description", "takeAways")):
+        return False, "too similar to an existing learning"
+    entry["_added"] = datetime.now(timezone.utc).isoformat()
+    items.append(entry)
+    _save(LEARNINGS, items)
+    _regen()
+    return True, "added"
+
+
+def _render_site(items):
+    """Write site/index.html with the data embedded, so opening the file
+    straight off disk always shows the latest entries (file:// blocks fetch).
+
+    The template (site/template.html) carries a `window.REGISTER_DATA =
+    __REGISTER_DATA__;` placeholder that we fill with the live JSON. The page
+    still tries fetch() when served over HTTP for live updates.
+    """
+    if not os.path.exists(SITE_TEMPLATE):
+        return
+    payload = json.dumps(items, ensure_ascii=False)
+    with open(SITE_TEMPLATE, encoding="utf-8") as f:
+        tpl = f.read()
+    html = tpl.replace("__REGISTER_DATA__", payload)
+    with open(SITE_HTML, "w", encoding="utf-8") as f:
+        f.write(html)
+
+
+def _regen():
+    """Write the combined data the site reads.
+
+    Three artifacts, all from the same data:
+      data.json - fetched by the page when served over HTTP (live updates)
+      data.js   - same array as a global; legacy fallback for file://
+      site/index.html - the page with data EMBEDDED, so opening it off disk
+                  always shows the latest entries with no fetch/CORS issues
+    """
+    items = _load(RESOURCES) + _load(LEARNINGS)
+    _save(COMBINED, items)
+    payload = json.dumps(items, indent=2, ensure_ascii=False)
+    with open(COMBINED_JS, "w") as f:
+        f.write("// Generated by store.py — do not edit by hand.\n"
+                f"window.REGISTER_DATA = {payload};\n")
+    _render_site(items)
+
+
+if __name__ == "__main__":
+    _regen()
+    print("regenerated", COMBINED, COMBINED_JS, "and", SITE_HTML)

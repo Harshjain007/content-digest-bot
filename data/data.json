@@ -1,0 +1,112 @@
+[
+  {
+    "title": "LangChain",
+    "description": "LLM framework",
+    "problem": "x",
+    "how this works": "y",
+    "links": {
+      "github": "https://github.com/langchain-ai/langchain"
+    },
+    "_added": "2026-08-01T23:49:37.121726+00:00"
+  },
+  {
+    "title": "Claude Code Plugins Directory",
+    "description": "A curated directory of high-quality plugins for Claude Code, providing a centralized marketplace for both internal and external plugins developed by Anthropic and the community.",
+    "problem": "Users need a reliable and trusted source to discover, install, and manage plugins for Claude Code. The directory addresses this by offering a structured and verified collection of plugins, ensuring ease of use and security.",
+    "how this works": "1. Visit the directory's GitHub repository or use the Claude Code plugin system.\n2. Browse or search for plugins in the `/external_plugins` or `/plugins` directories.\n3. Install a plugin using the command `/plugin install {plugin-name}@claude-plugins-official` or through the plugin discovery interface in Claude Code.\n4. Review the plugin's documentation, license, and security information before installation.\n5. Use the plugin within Claude Code according to its defined commands, agents, or skills.",
+    "links": {
+      "github": "https://github.com/anthropics/claude-plugins-official",
+      "website": "https://code.claude.com/docs/en/plugins",
+      "article": ""
+    },
+    "_added": "2026-08-02T01:33:30.044284+00:00"
+  },
+  {
+    "title": "Efficient Memory Management for Large Language Model Serving with PagedAttention",
+    "description": "# DEEP-DIVE: Efficient Memory Management for Large Language Model Serving with PagedAttention\n\n## TL;DR\n- PagedAttention addresses memory fragmentation in LLM serving by using non-contiguous memory blocks.\n- vLLM, built on PagedAttention, improves throughput by up to 4× with near-zero memory waste.\n- It enables flexible memory sharing across sequences and requests, reducing waste from internal and external fragmentation.\n\n## What it is\nPagedAttention is an attention algorithm inspired by virtual memory and paging techniques in operating systems. It allows the KV cache (key-value memory) of large language models (LLMs) to be stored in non-contiguous memory blocks, enabling efficient memory management and reducing waste. vLLM is an LLM serving system that implements PagedAttention to achieve high throughput and low memory usage.\n\n## How it works\n1. **KV Cache Partitioning**: The KV cache for each request is divided into fixed-size blocks (like memory pages).\n2. **Non-Contiguous Storage**: These blocks are stored in non-contiguous memory, allowing for flexible memory allocation.\n3. **Dynamic Block Allocation**: Blocks are allocated on demand, reducing the need for pre-allocating large contiguous memory spaces.\n4. **Block Tables**: Logical blocks are mapped to physical blocks using block tables, enabling efficient memory sharing and management.\n5. **PagedAttention Kernel**: The kernel processes attention operations using the logical blocks, accessing the KV cache as needed without pre-allocating large memory chunks.\n\n## What you can do with it\n- **Realistic**: Improve LLM serving throughput, reduce memory waste, and support complex decoding algorithms.\n- **Speculative**: Enable efficient memory sharing across multiple sequences and requests, and scale LLM services to handle large models and long sequences.\n\n## Key details & nuances\n- **Memory Management**: PagedAttention reduces internal and external fragmentation by using non-contiguous blocks.\n- **Block Size**: Block size affects both memory efficiency and performance. Larger blocks can reduce latency but increase fragmentation.\n- **Compatibility**: vLLM supports various LLMs like GPT, OPT, and LLaMA, including models exceeding single GPU memory capacity.\n- **Throughput**: vLLM achieves 2-4× higher throughput than existing systems like FasterTransformer and Orca.\n\n## Notable examples / tools\n- **vLLM**: An open-source LLM serving system built on PagedAttention.\n- **PagedAttention**: The core algorithm that enables efficient KV cache management.\n- **FasterTransformer and Orca**: State-of-the-art systems that vLLM outperforms in throughput.\n\n## How to go deeper\n1. **Read vLLM Documentation**: Explore the architecture and implementation details of vLLM.\n2. **Experiment with PagedAttention**: Try implementing PagedAttention in a small LLM serving system.\n3. **Compare Block Sizes**: Study the impact of different block sizes on memory efficiency and performance.\n4. **Evaluate Existing Systems**: Use benchmarks to compare memory usage and throughput of different LLM serving systems.\n5. **Explore Decoding Algorithms**: Investigate how different decoding algorithms (e.g., beam search, parallel sampling) interact with PagedAttention.\n\n## Open questions\n- How to automatically evaluate the effectiveness of memory management techniques in LLM serving?\n- What are the optimal block sizes for different LLM models and use cases?\n- How can PagedAttention be extended to support even more complex memory-sharing scenarios?\n- What are the trade-offs between memory efficiency and computational performance in PagedAttention-based systems?\n- How can PagedAttention be integrated into existing LLM serving frameworks without major overhauls?",
+    "type": "paper",
+    "links": {
+      "github": "",
+      "website": "",
+      "article": "https://arxiv.org/pdf/2309.06180"
+    },
+    "_added": "2026-08-02T22:35:37.591984+00:00"
+  },
+  {
+    "title": "Leetcode Companywise Interview Questions",
+    "description": "A repository containing company-wise LeetCode interview questions categorized by recency (Last 30 Days, Last 3 Months, etc.) with attributes like Difficulty, Acceptance %, and Frequency % for easy filtering.",
+    "problem": "This tool solves the problem of organizing and filtering LeetCode interview questions based on company, recency, and difficulty, making it easier for users to prepare for technical interviews by focusing on the most relevant and frequently asked questions.",
+    "how this works": "1. Clone the repository to access the CSV files containing the questions. 2. Use a CSV editor (like Excel, Google Sheets, or OpenOffice Calc) to sort and filter the data based on attributes such as difficulty, acceptance rate, and frequency. 3. For contributions, set up a Java project, configure the Scraper.java file with your LeetCode credentials, and run the scraper to update the dataset. 4. Submit a pull request to share your updated data with the community.",
+    "links": {
+      "github": "https://github.com/snehasishroy/leetcode-companywise-interview-questions",
+      "website": "https://snehasishroy.com/",
+      "article": ""
+    },
+    "_added": "2026-08-05T18:25:45.042044+00:00"
+  },
+  {
+    "title": "claude-skills",
+    "description": "A collection of skills and tools built for Claude, an AI assistant developed by Anthropic, offering various functionalities to enhance productivity and automation.",
+    "problem": "This repository addresses the need for a centralized hub of skills and tools for Claude, enabling users to easily access and utilize AI-driven capabilities for different tasks, thereby improving efficiency and reducing the learning curve for new users.",
+    "how this works": "1. Visit the GitHub repository to explore the available skills and tools for Claude.\n2. Choose a skill that aligns with your needs, such as coding, writing, or data analysis.\n3. Follow the provided documentation or setup instructions to integrate the skill with your Claude instance.\n4. Use the skill within Claude to automate tasks or enhance productivity based on its specific functionality.",
+    "links": {
+      "github": "https://github.com/topics/claude-skills",
+      "website": "",
+      "article": ""
+    },
+    "_added": "2026-08-05T18:43:16.605655+00:00"
+  },
+  {
+    "title": "OmniRoute",
+    "description": "OmniRoute is a free AI gateway that aggregates 291 AI providers, including 90+ free tiers, into one endpoint. It automatically routes requests to the most cost-effective and available provider, saving up to 95% tokens through compression and offering a zero-config setup for immediate use.",
+    "problem": "Managing multiple AI providers with different free tiers, rate limits, and configurations is complex and time-consuming. OmniRoute solves this by consolidating all providers into one endpoint, eliminating the need for manual management and providing real-time analytics and auto-fallback capabilities to avoid service interruptions.",
+    "how this works": "1. Install OmniRoute via npm or Docker. 2. Point your AI tool (e.g., Claude Code, Cursor, Cline) to the local endpoint (http://localhost:20128/v1). 3. Use the `auto` model to let OmniRoute select the optimal provider automatically. 4. Monitor usage and free token budgets through the dashboard (/dashboard/free-tiers). 5. Optionally, configure specific providers or use compression techniques (RTK + Caveman) to save tokens.",
+    "links": {
+      "github": "https://github.com/diegosouzapw/OmniRoute",
+      "website": "https://omniroute.online",
+      "article": ""
+    },
+    "_added": "2026-08-07T08:15:00.040513+00:00"
+  },
+  {
+    "title": "Headroom",
+    "description": "Headroom is a context compression layer for AI agents that reduces token usage by up to 95% for JSON data and 15-20% for coding agents. It compresses everything an AI agent reads before it reaches the LLM, including tool outputs, logs, RAG chunks, files, and conversation history, while preserving accuracy and enabling reversible compression.",
+    "problem": "AI agents often face high token costs due to the large volume of data they process. Headroom solves this by compressing data before it reaches the LLM, reducing token usage and costs without sacrificing accuracy. It also supports reversible compression, allowing original data to be retrieved when needed.",
+    "how this works": "Headroom operates through multiple modes: as a library for inline compression, a proxy for zero-code changes, or as an agent wrapper for seamless integration with popular coding agents. It uses a combination of SmartCrusher, CodeCompressor, and Kompress-v2-base models to compress data based on its type. The compressed data is stored locally, and the original data is cached for retrieval. Headroom also supports output token reduction, trimming unnecessary tokens from the model's responses to further reduce costs.",
+    "links": {
+      "github": "https://github.com/headroomlabs-ai/headroom",
+      "website": "https://docs.headroomlabs.ai/docs",
+      "article": "https://www.star-history.com/?repos=chopratejas%2Fheadroom&type=date&legend=top-left"
+    },
+    "_added": "2026-08-07T08:15:26.626430+00:00"
+  },
+  {
+    "title": "task-observer",
+    "description": "A self-improving meta-skill that identifies and enhances skills by observing work patterns, corrections, and gaps, enabling continuous learning and improvement of both existing and new skills.",
+    "problem": "Skills created by users often remain static and do not adapt to new usage patterns. Task Observer solves this by automatically identifying skill gaps, suggesting improvements, and evolving alongside the user's workflow, making skill maintenance and development more efficient.",
+    "how this works": "1. Install the skill by downloading the repo and placing SKILL.md and references/ folder in the correct location for your AI platform. 2. Use the skill in your AI sessions, allowing it to monitor your work for corrections, gaps, and blind spots. 3. Review the structured observation logs generated during each session, which include suggested improvements and cross-cutting principles. 4. Approve and apply updates to your skills, enabling continuous improvement without manual auditing.",
+    "links": {
+      "github": "https://github.com/rebelytics/one-skill-to-rule-them-all",
+      "website": "https://www.rebelytics.com/task-observer/",
+      "article": ""
+    },
+    "_added": "2026-08-07T08:15:48.600710+00:00"
+  },
+  {
+    "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
+    "links": "https://www.aiburnerofficial.com/resources/",
+    "takeAways": [
+      "Use Ditto + GSAP to clone websites with motion effects and avoid common debugging traps.",
+      "Implement Vibe Coding with structured context files to maintain project consistency and AI alignment.",
+      "Automate job applications on Naukri using a Claude-in-Chrome prompt with built-in security guardrails.",
+      "Follow step-by-step guides to publish Android apps on the Play Store, including setup and testing.",
+      "Build a ride-hailing app (Zuber) or quick-commerce delivery app (Clinkit) using free blueprints and AI tools.",
+      "Use Claude as an interview coach with customizable tracks, scored feedback, and study plans.",
+      "Automate WhatsApp communication with an AI-powered script for customer support and sales.",
+      "Leverage Stitch and Antigravity for design-to-development workflows with advanced settings and integration guides.",
+      "Optimize AI image/video generation API usage with custom instructions to avoid unnecessary costs.",
+      "Test React Native apps using Expo Go without needing Xcode or Android Studio."
+    ],
+    "_added": "2026-08-07T08:14:29.873428+00:00"
+  }
+]

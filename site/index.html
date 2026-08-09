@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Register — AI tools &amp; learnings, filed</title>
+<meta name="description" content="A working register of AI tools and learnings, filed automatically as they are found." />
+<style>
+  :root {
+    --paper:   #E9EAE4;
+    --paper-2: #F2F3EE;
+    --ink:     #1B2430;
+    --ink-soft:#5A6472;
+    --rule:    #C6CABF;
+    --stamp:   #A93C2E;
+    --inkblue: #2C4A7C;
+    --moss:    #4A6141;
+
+    --display: "Helvetica Neue", Inter, system-ui, -apple-system, sans-serif;
+    --body: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    --rail: 8.5rem;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  /* ---------------------------------------------------------- masthead */
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 2.5rem 1.5rem 1.25rem;
+  }
+  .masthead-inner { max-width: 62rem; margin: 0 auto; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 .75rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.4rem, 8vw, 4.5rem);
+    letter-spacing: -.045em;
+    line-height: .92;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .standfirst {
+    margin: .9rem 0 0;
+    max-width: 34rem;
+    color: var(--ink-soft);
+    font-size: 1rem;
+  }
+
+  /* ---------------------------------------------------------- controls */
+  .controls {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--paper);
+    border-bottom: 1px solid var(--rule);
+    padding: .75rem 1.5rem;
+  }
+  .controls-inner {
+    max-width: 62rem;
+    margin: 0 auto;
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #search {
+    flex: 1;
+    min-width: 12rem;
+    font-family: var(--mono);
+    font-size: .82rem;
+    padding: .55rem .7rem;
+    color: var(--ink);
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+  }
+  #search::placeholder { color: var(--ink-soft); }
+  .filters { display: flex; gap: -1px; }
+  .filters button {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: .55rem .8rem;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 1px solid var(--rule);
+    margin-left: -1px;
+    cursor: pointer;
+  }
+  .filters button:first-child { margin-left: 0; }
+  .filters button[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+  .count {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .08em;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  /* ---------------------------------------------------------- register */
+  main { max-width: 62rem; margin: 0 auto; padding: 0 1.5rem 5rem; }
+
+  .entry {
+    display: grid;
+    grid-template-columns: var(--rail) 1fr;
+    gap: 0 2rem;
+    padding: 2.25rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* signature: the accession stamp */
+  .rail { position: relative; }
+  .stamp {
+    display: inline-block;
+    border: 2px solid var(--stamp);
+    border-radius: 3px;
+    color: var(--stamp);
+    font-family: var(--mono);
+    font-size: .66rem;
+    line-height: 1.35;
+    letter-spacing: .06em;
+    text-align: center;
+    padding: .35rem .5rem;
+    transform: rotate(-4deg);
+    opacity: .85;
+  }
+  .stamp b { display: block; font-size: .95rem; letter-spacing: .02em; }
+  .kind {
+    display: block;
+    margin-top: .9rem;
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .kind.tool  { color: var(--inkblue); }
+  .kind.learn { color: var(--moss); }
+
+  /* Grid/flex children default to min-width:auto and refuse to shrink below
+     their content — long titles, URLs and code strings would push the page
+     wider than the viewport without these. */
+  .rail, .body { min-width: 0; }
+  .body { overflow-wrap: anywhere; }
+
+  .body h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.7rem;
+    letter-spacing: -.025em;
+    line-height: 1.15;
+    margin: -.35rem 0 .5rem;
+  }
+  .lede { margin: 0 0 1rem; }
+  .field { margin: 0 0 1rem; }
+  .field-label {
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 .2rem;
+  }
+  .field p { margin: 0; }
+
+  details.field summary {
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    cursor: pointer;
+    list-style: none;
+  }
+  details.field summary::-webkit-details-marker { display: none; }
+  details.field summary::before {
+    content: "+ ";
+    color: var(--stamp);
+  }
+  details.field[open] summary::before { content: "− "; }
+  details.field .steps {
+    margin: .5rem 0 0;
+    white-space: pre-wrap;
+  }
+
+  .links { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-top: 1rem; }
+  .links a {
+    font-family: var(--mono);
+    font-size: .72rem;
+    color: var(--inkblue);
+    text-decoration: none;
+    border-bottom: 1px solid currentColor;
+    padding-bottom: 1px;
+  }
+  .links a:hover { color: var(--stamp); }
+
+  .empty {
+    font-family: var(--mono);
+    font-size: .8rem;
+    color: var(--ink-soft);
+    padding: 4rem 0;
+    text-align: center;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--stamp);
+    outline-offset: 2px;
+  }
+
+  /* page-load stagger */
+  .entry { animation: rise .45s ease both; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .entry { animation: none; }
+    * { transition: none !important; }
+  }
+
+  @media (max-width: 40rem) {
+    :root { --rail: auto; }
+    .entry { grid-template-columns: 1fr; gap: .9rem; }
+    .rail { display: flex; align-items: center; gap: 1rem; }
+    .stamp { transform: none; }
+    .kind { margin-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <p class="eyebrow">Filed automatically · <span id="range">—</span> · <span id="updated">—</span></p>
+    <h1>The<br />Register</h1>
+    <p class="standfirst">
+      AI tools and learnings, recorded as they turn up. Each entry keeps the
+      problem it solves, how to run it, and where it came from.
+    </p>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="controls-inner">
+    <input id="search" type="search" placeholder="Search the register…"
+           autocomplete="off" aria-label="Search the register" />
+    <div class="filters" role="group" aria-label="Filter entries">
+      <button data-filter="all" aria-pressed="true">All</button>
+      <button data-filter="tool" aria-pressed="false">Tools</button>
+      <button data-filter="paper" aria-pressed="false">Papers</button>
+      <button data-filter="learn" aria-pressed="false">Learnings</button>
+    </div>
+    <span class="count" id="count"></span>
+  </div>
+</div>
+
+<main id="register">
+  <p class="empty">Reading the register…</p>
+</main>
+
+<!-- Generated by store.py. Lets the page work when opened straight off disk. -->
+<script>window.REGISTER_DATA = [{"title": "LangChain", "description": "LLM framework", "problem": "x", "how this works": "y", "links": {"github": "https://github.com/langchain-ai/langchain"}, "_added": "2026-08-01T23:49:37.121726+00:00"}, {"title": "Claude Code Plugins Directory", "description": "A curated directory of high-quality plugins for Claude Code, providing a centralized marketplace for both internal and external plugins developed by Anthropic and the community.", "problem": "Users need a reliable and trusted source to discover, install, and manage plugins for Claude Code. The directory addresses this by offering a structured and verified collection of plugins, ensuring ease of use and security.", "how this works": "1. Visit the directory's GitHub repository or use the Claude Code plugin system.\n2. Browse or search for plugins in the `/external_plugins` or `/plugins` directories.\n3. Install a plugin using the command `/plugin install {plugin-name}@claude-plugins-official` or through the plugin discovery interface in Claude Code.\n4. Review the plugin's documentation, license, and security information before installation.\n5. Use the plugin within Claude Code according to its defined commands, agents, or skills.", "links": {"github": "https://github.com/anthropics/claude-plugins-official", "website": "https://code.claude.com/docs/en/plugins", "article": ""}, "_added": "2026-08-02T01:33:30.044284+00:00"}, {"title": "Efficient Memory Management for Large Language Model Serving with PagedAttention", "description": "# DEEP-DIVE: Efficient Memory Management for Large Language Model Serving with PagedAttention\n\n## TL;DR\n- PagedAttention addresses memory fragmentation in LLM serving by using non-contiguous memory blocks.\n- vLLM, built on PagedAttention, improves throughput by up to 4× with near-zero memory waste.\n- It enables flexible memory sharing across sequences and requests, reducing waste from internal and external fragmentation.\n\n## What it is\nPagedAttention is an attention algorithm inspired by virtual memory and paging techniques in operating systems. It allows the KV cache (key-value memory) of large language models (LLMs) to be stored in non-contiguous memory blocks, enabling efficient memory management and reducing waste. vLLM is an LLM serving system that implements PagedAttention to achieve high throughput and low memory usage.\n\n## How it works\n1. **KV Cache Partitioning**: The KV cache for each request is divided into fixed-size blocks (like memory pages).\n2. **Non-Contiguous Storage**: These blocks are stored in non-contiguous memory, allowing for flexible memory allocation.\n3. **Dynamic Block Allocation**: Blocks are allocated on demand, reducing the need for pre-allocating large contiguous memory spaces.\n4. **Block Tables**: Logical blocks are mapped to physical blocks using block tables, enabling efficient memory sharing and management.\n5. **PagedAttention Kernel**: The kernel processes attention operations using the logical blocks, accessing the KV cache as needed without pre-allocating large memory chunks.\n\n## What you can do with it\n- **Realistic**: Improve LLM serving throughput, reduce memory waste, and support complex decoding algorithms.\n- **Speculative**: Enable efficient memory sharing across multiple sequences and requests, and scale LLM services to handle large models and long sequences.\n\n## Key details & nuances\n- **Memory Management**: PagedAttention reduces internal and external fragmentation by using non-contiguous blocks.\n- **Block Size**: Block size affects both memory efficiency and performance. Larger blocks can reduce latency but increase fragmentation.\n- **Compatibility**: vLLM supports various LLMs like GPT, OPT, and LLaMA, including models exceeding single GPU memory capacity.\n- **Throughput**: vLLM achieves 2-4× higher throughput than existing systems like FasterTransformer and Orca.\n\n## Notable examples / tools\n- **vLLM**: An open-source LLM serving system built on PagedAttention.\n- **PagedAttention**: The core algorithm that enables efficient KV cache management.\n- **FasterTransformer and Orca**: State-of-the-art systems that vLLM outperforms in throughput.\n\n## How to go deeper\n1. **Read vLLM Documentation**: Explore the architecture and implementation details of vLLM.\n2. **Experiment with PagedAttention**: Try implementing PagedAttention in a small LLM serving system.\n3. **Compare Block Sizes**: Study the impact of different block sizes on memory efficiency and performance.\n4. **Evaluate Existing Systems**: Use benchmarks to compare memory usage and throughput of different LLM serving systems.\n5. **Explore Decoding Algorithms**: Investigate how different decoding algorithms (e.g., beam search, parallel sampling) interact with PagedAttention.\n\n## Open questions\n- How to automatically evaluate the effectiveness of memory management techniques in LLM serving?\n- What are the optimal block sizes for different LLM models and use cases?\n- How can PagedAttention be extended to support even more complex memory-sharing scenarios?\n- What are the trade-offs between memory efficiency and computational performance in PagedAttention-based systems?\n- How can PagedAttention be integrated into existing LLM serving frameworks without major overhauls?", "type": "paper", "links": {"github": "", "website": "", "article": "https://arxiv.org/pdf/2309.06180"}, "_added": "2026-08-02T22:35:37.591984+00:00"}, {"title": "Leetcode Companywise Interview Questions", "description": "A repository containing company-wise LeetCode interview questions categorized by recency (Last 30 Days, Last 3 Months, etc.) with attributes like Difficulty, Acceptance %, and Frequency % for easy filtering.", "problem": "This tool solves the problem of organizing and filtering LeetCode interview questions based on company, recency, and difficulty, making it easier for users to prepare for technical interviews by focusing on the most relevant and frequently asked questions.", "how this works": "1. Clone the repository to access the CSV files containing the questions. 2. Use a CSV editor (like Excel, Google Sheets, or OpenOffice Calc) to sort and filter the data based on attributes such as difficulty, acceptance rate, and frequency. 3. For contributions, set up a Java project, configure the Scraper.java file with your LeetCode credentials, and run the scraper to update the dataset. 4. Submit a pull request to share your updated data with the community.", "links": {"github": "https://github.com/snehasishroy/leetcode-companywise-interview-questions", "website": "https://snehasishroy.com/", "article": ""}, "_added": "2026-08-05T18:25:45.042044+00:00"}, {"title": "claude-skills", "description": "A collection of skills and tools built for Claude, an AI assistant developed by Anthropic, offering various functionalities to enhance productivity and automation.", "problem": "This repository addresses the need for a centralized hub of skills and tools for Claude, enabling users to easily access and utilize AI-driven capabilities for different tasks, thereby improving efficiency and reducing the learning curve for new users.", "how this works": "1. Visit the GitHub repository to explore the available skills and tools for Claude.\n2. Choose a skill that aligns with your needs, such as coding, writing, or data analysis.\n3. Follow the provided documentation or setup instructions to integrate the skill with your Claude instance.\n4. Use the skill within Claude to automate tasks or enhance productivity based on its specific functionality.", "links": {"github": "https://github.com/topics/claude-skills", "website": "", "article": ""}, "_added": "2026-08-05T18:43:16.605655+00:00"}, {"title": "OmniRoute", "description": "OmniRoute is a free AI gateway that aggregates 291 AI providers, including 90+ free tiers, into one endpoint. It automatically routes requests to the most cost-effective and available provider, saving up to 95% tokens through compression and offering a zero-config setup for immediate use.", "problem": "Managing multiple AI providers with different free tiers, rate limits, and configurations is complex and time-consuming. OmniRoute solves this by consolidating all providers into one endpoint, eliminating the need for manual management and providing real-time analytics and auto-fallback capabilities to avoid service interruptions.", "how this works": "1. Install OmniRoute via npm or Docker. 2. Point your AI tool (e.g., Claude Code, Cursor, Cline) to the local endpoint (http://localhost:20128/v1). 3. Use the `auto` model to let OmniRoute select the optimal provider automatically. 4. Monitor usage and free token budgets through the dashboard (/dashboard/free-tiers). 5. Optionally, configure specific providers or use compression techniques (RTK + Caveman) to save tokens.", "links": {"github": "https://github.com/diegosouzapw/OmniRoute", "website": "https://omniroute.online", "article": ""}, "_added": "2026-08-07T08:15:00.040513+00:00"}, {"title": "Headroom", "description": "Headroom is a context compression layer for AI agents that reduces token usage by up to 95% for JSON data and 15-20% for coding agents. It compresses everything an AI agent reads before it reaches the LLM, including tool outputs, logs, RAG chunks, files, and conversation history, while preserving accuracy and enabling reversible compression.", "problem": "AI agents often face high token costs due to the large volume of data they process. Headroom solves this by compressing data before it reaches the LLM, reducing token usage and costs without sacrificing accuracy. It also supports reversible compression, allowing original data to be retrieved when needed.", "how this works": "Headroom operates through multiple modes: as a library for inline compression, a proxy for zero-code changes, or as an agent wrapper for seamless integration with popular coding agents. It uses a combination of SmartCrusher, CodeCompressor, and Kompress-v2-base models to compress data based on its type. The compressed data is stored locally, and the original data is cached for retrieval. Headroom also supports output token reduction, trimming unnecessary tokens from the model's responses to further reduce costs.", "links": {"github": "https://github.com/headroomlabs-ai/headroom", "website": "https://docs.headroomlabs.ai/docs", "article": "https://www.star-history.com/?repos=chopratejas%2Fheadroom&type=date&legend=top-left"}, "_added": "2026-08-07T08:15:26.626430+00:00"}, {"title": "task-observer", "description": "A self-improving meta-skill that identifies and enhances skills by observing work patterns, corrections, and gaps, enabling continuous learning and improvement of both existing and new skills.", "problem": "Skills created by users often remain static and do not adapt to new usage patterns. Task Observer solves this by automatically identifying skill gaps, suggesting improvements, and evolving alongside the user's workflow, making skill maintenance and development more efficient.", "how this works": "1. Install the skill by downloading the repo and placing SKILL.md and references/ folder in the correct location for your AI platform. 2. Use the skill in your AI sessions, allowing it to monitor your work for corrections, gaps, and blind spots. 3. Review the structured observation logs generated during each session, which include suggested improvements and cross-cutting principles. 4. Approve and apply updates to your skills, enabling continuous improvement without manual auditing.", "links": {"github": "https://github.com/rebelytics/one-skill-to-rule-them-all", "website": "https://www.rebelytics.com/task-observer/", "article": ""}, "_added": "2026-08-07T08:15:48.600710+00:00"}, {"description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.", "links": "https://www.aiburnerofficial.com/resources/", "takeAways": ["Use Ditto + GSAP to clone websites with motion effects and avoid common debugging traps.", "Implement Vibe Coding with structured context files to maintain project consistency and AI alignment.", "Automate job applications on Naukri using a Claude-in-Chrome prompt with built-in security guardrails.", "Follow step-by-step guides to publish Android apps on the Play Store, including setup and testing.", "Build a ride-hailing app (Zuber) or quick-commerce delivery app (Clinkit) using free blueprints and AI tools.", "Use Claude as an interview coach with customizable tracks, scored feedback, and study plans.", "Automate WhatsApp communication with an AI-powered script for customer support and sales.", "Leverage Stitch and Antigravity for design-to-development workflows with advanced settings and integration guides.", "Optimize AI image/video generation API usage with custom instructions to avoid unnecessary costs.", "Test React Native apps using Expo Go without needing Xcode or Android Studio."], "_added": "2026-08-07T08:14:29.873428+00:00"}];</script>
+<script>
+"use strict";
+
+let DATA = [];
+let FILTER = "all";
+
+/* ------------------------------------------------------------ escaping */
+const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ESC[c]);
+}
+
+/* Only http(s) links are ever rendered — entries are written by an LLM, so a
+   javascript:/data: URL must never reach an href. Returns null if unusable. */
+function safeUrl(u) {
+  if (typeof u !== "string" || !u.trim()) return null;
+  // Parsed with no base: entries are model-written, so anything that isn't an
+  // absolute http(s) URL is dropped rather than resolved into a dead local link.
+  let parsed;
+  try {
+    parsed = new URL(u.trim());
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  return parsed;
+}
+
+function linkHTML(u, label) {
+  const parsed = safeUrl(u);
+  if (!parsed) return "";
+  const text = label || parsed.hostname.replace(/^www\./, "");
+  return `<a href="${esc(parsed.href)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>`;
+}
+
+/* -------------------------------------------------------------- shaping */
+function kindOf(item) {
+  if (item && item.type === "paper") return "paper";
+  return item && item.links && typeof item.links === "object" ? "tool" : "learn";
+}
+
+function accessionDate(item) {
+  const d = new Date(item._added);
+  return isNaN(d) ? null : d;
+}
+
+function stampHTML(item, no) {
+  const d = accessionDate(item);
+  const date = d
+    ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase()
+    : "UNDATED";
+  return `<span class="stamp"><b>No. ${esc(String(no).padStart(3, "0"))}</b>${esc(date)}</span>`;
+}
+
+/* Render a labelled field, but only when there is something worth showing. */
+function fieldHTML(label, value) {
+  const v = (value == null ? "" : String(value)).trim();
+  if (v.length < 2) return "";
+  return `<div class="field"><p class="field-label">${esc(label)}</p><p>${esc(v)}</p></div>`;
+}
+
+function entryHTML(item, no) {
+  const kind = kindOf(item);
+  const parts = [];
+
+  if (kind === "paper") {
+    const L = item.links || {};
+    const title = (item.title || "").trim();
+    if (title) parts.push(`<h2>${esc(title)}</h2>`);
+    const desc = (item.description || "").trim();
+    if (desc) parts.push(`<div class="field"><p class="field-label">Full explanation</p><p>${esc(desc)}</p></div>`);
+    const links = [
+      linkHTML(L.article || item.links, "Source PDF"),
+      linkHTML(L.website, "Website"),
+      linkHTML(L.github, "GitHub"),
+    ].filter(Boolean);
+    if (links.length) parts.push(`<div class="links">${links.join("")}</div>`);
+  } else if (kind === "tool") {
+    const L = item.links || {};
+    const title = (item.title || "").trim();
+    if (title) parts.push(`<h2>${esc(title)}</h2>`);
+    const desc = (item.description || "").trim();
+    if (desc) parts.push(`<p class="lede">${esc(desc)}</p>`);
+    parts.push(fieldHTML("Problem it solves", item.problem));
+
+    const how = (item["how this works"] || "").trim();
+    if (how.length > 2) {
+      parts.push(
+        `<details class="field"><summary>How it works</summary>` +
+        `<p class="steps">${esc(how)}</p></details>`
+      );
+    }
+
+    const links = [
+      linkHTML(L.github, "GitHub"),
+      linkHTML(L.website, "Website"),
+      linkHTML(L.article, "Source article"),
+    ].filter(Boolean);
+    if (links.length) parts.push(`<div class="links">${links.join("")}</div>`);
+  } else {
+    parts.push(fieldHTML("What it covers", item.description));
+    const take = (item.takeAways || "").trim();
+    if (take.length > 2) {
+      parts.push(
+        `<details class="field"><summary>Takeaways</summary>` +
+        `<p class="steps">${esc(take)}</p></details>`
+      );
+    }
+    const link = linkHTML(item.links, "Source article");
+    if (link) parts.push(`<div class="links">${link}</div>`);
+  }
+
+  return `<article class="entry" style="animation-delay:${Math.min(no, 12) * 35}ms">
+    <div class="rail">
+      ${stampHTML(item, no)}
+      <span class="kind ${kind}">${kind === "tool" ? "Tool" : kind === "paper" ? "Paper" : "Learning"}</span>
+    </div>
+    <div class="body">${parts.join("")}</div>
+  </article>`;
+}
+
+/* ------------------------------------------------------------ rendering */
+function render() {
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  const host = document.getElementById("register");
+
+  const matches = DATA.filter(entry => {
+    if (FILTER !== "all" && kindOf(entry.item) !== FILTER) return false;
+    return !q || entry.haystack.includes(q);
+  });
+
+  document.getElementById("count").textContent =
+    `${matches.length} / ${DATA.length} entries`;
+
+  if (!matches.length) {
+    host.innerHTML = `<p class="empty">Nothing filed under that yet. Try a broader term.</p>`;
+    return;
+  }
+  host.innerHTML = matches.map(e => entryHTML(e.item, e.no)).join("");
+}
+
+function setFilter(f) {
+  FILTER = f;
+  document.querySelectorAll(".filters button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.filter === f)));
+  render();
+}
+
+function setRange() {
+  const dates = DATA.map(e => accessionDate(e.item)).filter(Boolean);
+  if (!dates.length) return;
+  const fmt = d => d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  const first = fmt(dates[dates.length - 1]);
+  const last = fmt(dates[0]);
+  document.getElementById("range").textContent =
+    first === last ? first : `${first} – ${last}`;
+}
+
+async function load() {
+  const host = document.getElementById("register");
+  // Served over HTTP, prefer the JSON so the page always shows the latest
+  // entries. Opened straight off disk, fetch is blocked by CORS and we fall
+  // back to the data.js global, which store.py writes alongside data.json.
+  let raw;
+  if (location.protocol !== "file:") {
+    for (const path of ["../data/data.json", "data/data.json"]) {
+      try {
+        const r = await fetch(path, { cache: "no-store" });
+        if (!r.ok) continue;
+        raw = await r.json();
+        break;
+      } catch { /* try the next path */ }
+    }
+  }
+  if (raw === undefined) raw = window.REGISTER_DATA;
+  if (raw === undefined) {
+    host.innerHTML = `<p class="empty">No data found. Run
+      <code>python -m content_digest_bot.store</code> to generate data/data.js,
+      then reload.</p>`;
+    return;
+  }
+  if (!Array.isArray(raw)) raw = [];
+
+  // Newest first; accession numbers count down so No. 001 is the oldest entry.
+  raw.sort((a, b) => String(b._added || "").localeCompare(String(a._added || "")));
+  DATA = raw.map((item, i) => ({
+    item,
+    no: raw.length - i,
+    haystack: JSON.stringify(item).toLowerCase(),
+  }));
+
+  setRange();
+  render();
+}
+
+document.getElementById("search").addEventListener("input", render);
+document.querySelectorAll(".filters button").forEach(b =>
+  b.addEventListener("click", () => setFilter(b.dataset.filter)));
+
+function stampUpdated() {
+  document.getElementById("updated").textContent =
+    "updated " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+// Keep the page live: re-pull data every 15s so a new filing shows up without
+// a manual refresh. Only re-renders when the payload actually changed.
+let _seen = "";
+async function refresh() {
+  let raw;
+  if (location.protocol !== "file:") {
+    for (const path of ["../data/data.json", "data/data.json"]) {
+      try {
+        const r = await fetch(path + "?t=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) continue;
+        raw = await r.json();
+        break;
+      } catch { /* next */ }
+    }
+  }
+  if (raw === undefined && window.REGISTER_DATA) raw = window.REGISTER_DATA;
+  if (!raw) return;
+  const sig = JSON.stringify(raw);
+  if (sig === _seen) return;          // nothing new
+  _seen = sig;
+  if (!Array.isArray(raw)) raw = [];
+  raw.sort((a, b) => String(b._added || "").localeCompare(String(a._added || "")));
+  DATA = raw.map((item, i) => ({ item, no: raw.length - i, haystack: JSON.stringify(item).toLowerCase() }));
+  setRange();
+  render();
+  stampUpdated();
+}
+
+load().then(stampUpdated);
+setInterval(refresh, 15000);
+</script>
+</body>
+</html>
