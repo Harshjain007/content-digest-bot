@@ -140,9 +140,67 @@ def extract_pdf(url, max_chars=30000):
                 "text": None, "failed": True}
 
 
+def _is_doc(url, content_type=None):
+    u = (url or "").lower().split("?")[0]
+    if u.endswith(".docx"):
+        return True
+    if u.endswith(".doc"):
+        return True
+    ct = (content_type or "").lower()
+    return "wordprocessingml" in ct or "application/msword" in ct or \
+        "application/vnd.openxmlformats-officedocument.wordprocessingml" in ct
+
+
+def extract_doc(url, max_chars=30000):
+    """Extract text from a Word document (.docx) URL via python-docx.
+
+    .docx is fully supported. Legacy .doc (binary) is not readable by
+    python-docx — we flag it so the bot can tell the user.
+    """
+    if url and url.lower().split("?")[0].endswith(".doc") and \
+            not url.lower().endswith(".docx"):
+        return {"source": "Article", "title": "Word doc (.doc)",
+                "url": url, "text": None,
+                "failed": True,
+                "note": "Legacy .doc files aren't supported — please "
+                        "re-save as .docx and reshare."}
+    raw, ctype = _fetch_bytes(url)
+    if not raw:
+        return {"source": "Article", "title": "Word doc", "url": url,
+                "text": None, "failed": True}
+    try:
+        import docx
+        import io
+        doc = docx.Document(io.BytesIO(raw))
+        parts = [p.text for p in doc.paragraphs if p.text.strip()]
+        # Also pull tables (common in docs).
+        for table in doc.tables:
+            for row in table.rows:
+                cells = [c.text.strip() for c in row.cells if c.text.strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+        text = "\n\n".join(parts).strip()
+        title = (doc.core_properties.title or "").strip() or url
+        if len(text) < 50:
+            raise RuntimeError("Too little text extracted from document")
+        return {
+            "source": "Article",
+            "title": title,
+            "url": url,
+            "text": text[:max_chars],
+            "is_doc": True,
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.warning("DOC extraction failed for %s: %s", url, e)
+        return {"source": "Article", "title": "Word doc", "url": url,
+                "text": None, "failed": True}
+
+
 def extract_article(url, max_chars=30000):
     # PDFs and PDF-like responses go through the PDF extractor.
     raw_head, ctype = _fetch_bytes(url)
+    if raw_head is not None and _is_doc(url, ctype):
+        return extract_doc(url, max_chars=max_chars)
     if raw_head is not None and _is_pdf(url, ctype):
         return extract_pdf(url, max_chars=max_chars)
     try:

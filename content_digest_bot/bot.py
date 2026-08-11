@@ -162,8 +162,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status.edit_text("⚠️ Couldn't read that article. "
                                        "Paste the text and I'll digest it.")
                 return
-            # PDFs: full descriptive summary, saved as a resource card.
-            if data.get("is_pdf"):
+            # PDFs / Word docs: full descriptive summary, saved as a resource card.
+            if data.get("is_pdf") or data.get("is_doc"):
                 await _handle_pdf(update, status, data)
                 return
             gh = _find_github_link(data.get("text") or "")
@@ -237,27 +237,31 @@ async def _handle_tool(update, status, github_url, article_url, article_text):
 
 
 async def _handle_pdf(update, status, data):
-    """PDF / paper: full descriptive summary, saved as a resource card.
+    """PDF / Word doc: full descriptive summary, saved as a resource card.
 
     The user wants a complete, readable explanation they can revisit on the
     web page — so we generate the full deep-dive (not the short summary) and
     persist it as a resource.
     """
-    await status.edit_text("📄 Reading the PDF and writing a full explanation…")
+    kind = "Word document" if data.get("is_doc") else "PDF"
+    if data.get("note"):  # e.g. legacy .doc not supported
+        await status.edit_text(f"⚠️ {data['note']}")
+        return
+    await status.edit_text(f"📄 Reading the {kind} and writing a full explanation…")
     try:
         summary = synthesize(data, mode="full", num_predict=4096)
     except Exception as e:  # noqa: BLE001
-        logger.exception("pdf summary failed")
-        await status.edit_text(f"❌ Couldn't summarize the PDF: {e}")
+        logger.exception("doc summary failed")
+        await status.edit_text(f"❌ Couldn't summarize the {kind}: {e}")
         return
     if not summary:
-        await status.edit_text("⚠️ Couldn't read that PDF. Paste the text.")
+        await status.edit_text(f"⚠️ Couldn't read that {kind}. Paste the text.")
         return
 
     entry = {
-        "title": data.get("title") or (data.get("url") or "PDF"),
+        "title": data.get("title") or (data.get("url") or kind),
         "description": summary,
-        "type": "paper",
+        "type": "doc" if data.get("is_doc") else "paper",
         "links": {"github": "", "website": "",
                   "article": data.get("url") or ""},
     }

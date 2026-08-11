@@ -57,6 +57,18 @@
     "_added": "2026-08-05T18:43:16.605655+00:00"
   },
   {
+    "title": "Flask",
+    "description": "Flask is a lightweight WSGI web application framework for Python, designed to make getting started quick and easy, with the ability to scale up to complex applications. It is a flexible framework that allows developers to choose their own tools and libraries, with a strong community providing many extensions for added functionality.",
+    "problem": "Flask solves the problem of building web applications by providing a lightweight, easy-to-use framework that simplifies the development process. It reduces the complexity of setting up a web application and allows developers to focus on the core logic of their application without being tied to specific tools or project layouts.",
+    "how this works": "1. Install Flask using pip: `pip install Flask`\n2. Create a Python file (e.g., app.py) and define a Flask application using the `Flask` class.\n3. Define routes using the `@app.route()` decorator to map URLs to functions.\n4. Run the application using the `flask run` command or by calling the `app.run()` method.\n5. Access the application in a web browser at the specified URL (e.g., http://127.0.0.1:5000/).",
+    "links": {
+      "github": "https://github.com/pallets/flask",
+      "website": "https://flask.palletsprojects.com",
+      "article": ""
+    },
+    "_added": "2026-08-05T18:47:54.359569+00:00"
+  },
+  {
     "title": "OmniRoute",
     "description": "OmniRoute is a free AI gateway that aggregates 291 AI providers, including 90+ free tiers, into one endpoint. It automatically routes requests to the most cost-effective and available provider, saving up to 95% tokens through compression and offering a zero-config setup for immediate use.",
     "problem": "Managing multiple AI providers with different free tiers, rate limits, and configurations is complex and time-consuming. OmniRoute solves this by consolidating all providers into one endpoint, eliminating the need for manual management and providing real-time analytics and auto-fallback capabilities to avoid service interruptions.",
@@ -91,6 +103,30 @@
       "article": ""
     },
     "_added": "2026-08-07T08:15:48.600710+00:00"
+  },
+  {
+    "title": "Strix",
+    "description": "Strix is an open-source AI pentesting tool that automates the process of finding and fixing vulnerabilities in applications. It uses autonomous AI agents to perform reconnaissance, exploitation, and validation of security vulnerabilities, providing real exploit proofs-of-concept and actionable remediation guidance.",
+    "problem": "Strix solves the problem of manual and time-consuming security testing by offering an automated, efficient, and accurate way to identify and validate vulnerabilities. It reduces the overhead of manual pentesting and eliminates false positives from static analysis tools, making it easier for developers and security teams to maintain secure applications.",
+    "how this works": "1. Install Strix using the provided script: `curl -sSL https://strix.ai/install | bash`\n2. Configure your AI provider by setting environment variables like `STRIX_LLM` and `LLM_API_KEY`.\n3. Run a security assessment with the command: `strix --target ./app-directory`\n4. Strix will automatically pull the sandbox Docker image and perform a dynamic security scan, saving results to `strix_runs/<run-name>`.\n5. Use the `strix view` command to access a local dashboard for detailed findings and reports.\n6. For CI/CD integration, set up a GitHub Actions workflow to run Strix on pull requests.",
+    "links": {
+      "github": "https://github.com/usestrix/strix",
+      "website": "https://strix.ai",
+      "article": ""
+    },
+    "_added": "2026-08-11T10:10:51.923174+00:00"
+  },
+  {
+    "title": "CRM",
+    "description": "Comp AI CRM is an open source, CRM designed for AI agents. It is an agentic-first CRM where the agent keeps its notes and runs on its own deployment, schedule, and work queue. The agent decides what to look at next, books follow-ups, spends a research budget, and stops when the budget runs out. It ensures nothing about a person is guessed, and tools report what they observed, with a ledger pricing the evidence.",
+    "problem": "Traditional CRMs are databases with forms and chat boxes that rely on humans to find and record information. This CRM solves the problem by making the AI agent the core of the CRM, automating tasks like research, follow-ups, and data collection. It eliminates the need for manual input and ensures accurate, evidence-based data recording.",
+    "how this works": "1. Clone the repository and set up the environment with Bun and Docker.\n2. Configure the `.env` file with necessary credentials and settings.\n3. Run the development server and access the app at http://localhost:3000.\n4. The agent runs autonomously, using tools, skills, and schedules to process data and update records.\n5. Use the Agent tab on each contact, company, or deal to watch the agent work and interact with it.",
+    "links": {
+      "github": "https://github.com/trycompai/crm",
+      "website": "https://trycrm.ai",
+      "article": ""
+    },
+    "_added": "2026-08-11T10:11:16.718214+00:00"
   },
   {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
