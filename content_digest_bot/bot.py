@@ -210,7 +210,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def _pages_link():
-    return f"\n\n🔗 View on the register: {PAGES_URL}"
+    return f"🔗 Register: {PAGES_URL}"
 
 
 async def _handle_tool(update, status, github_url, article_url, article_text):
@@ -242,7 +242,8 @@ async def _handle_tool(update, status, github_url, article_url, article_text):
     else:
         await update.message.reply_text(
             f"⚠️ Skipped — {reason} (already in your knowledge base).")
-    await update.message.reply_text(_pretty_json(entry) + _pages_link())
+    await update.message.reply_text(_pretty_json(entry))
+    await update.message.reply_text(_pages_link(), parse_mode=ParseMode.HTML)
 
 
 async def _handle_pdf(update, status, data):
@@ -304,7 +305,8 @@ async def _handle_learning(update, status, article_text, article_url):
     else:
         await update.message.reply_text(
             f"⚠️ Skipped — {reason} (already in your knowledge base).")
-    await update.message.reply_text(_pretty_json(entry) + _pages_link())
+    await update.message.reply_text(_pretty_json(entry))
+    await update.message.reply_text(_pages_link(), parse_mode=ParseMode.HTML)
 
 
 # ----------------------------------------------------------------- helpers
