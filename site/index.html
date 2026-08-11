@@ -271,6 +271,7 @@
       <button data-filter="all" aria-pressed="true">All</button>
       <button data-filter="tool" aria-pressed="false">Tools</button>
       <button data-filter="paper" aria-pressed="false">Papers</button>
+      <button data-filter="doc" aria-pressed="false">Docs</button>
       <button data-filter="learn" aria-pressed="false">Learnings</button>
     </div>
     <span class="count" id="count"></span>
@@ -321,6 +322,7 @@ function linkHTML(u, label) {
 /* -------------------------------------------------------------- shaping */
 function kindOf(item) {
   if (item && item.type === "paper") return "paper";
+  if (item && item.type === "doc") return "doc";
   return item && item.links && typeof item.links === "object" ? "tool" : "learn";
 }
 
@@ -356,6 +358,18 @@ function entryHTML(item, no) {
     if (desc) parts.push(`<div class="field"><p class="field-label">Full explanation</p><p>${esc(desc)}</p></div>`);
     const links = [
       linkHTML(L.article || item.links, "Source PDF"),
+      linkHTML(L.website, "Website"),
+      linkHTML(L.github, "GitHub"),
+    ].filter(Boolean);
+    if (links.length) parts.push(`<div class="links">${links.join("")}</div>`);
+  } else if (kind === "doc") {
+    const L = item.links || {};
+    const title = (item.title || "").trim();
+    if (title) parts.push(`<h2>${esc(title)}</h2>`);
+    const desc = (item.description || "").trim();
+    if (desc) parts.push(`<div class="field"><p class="field-label">Document summary</p><p>${esc(desc)}</p></div>`);
+    const links = [
+      linkHTML(L.article || item.links, "Source document"),
       linkHTML(L.website, "Website"),
       linkHTML(L.github, "GitHub"),
     ].filter(Boolean);
@@ -398,7 +412,7 @@ function entryHTML(item, no) {
   return `<article class="entry" style="animation-delay:${Math.min(no, 12) * 35}ms">
     <div class="rail">
       ${stampHTML(item, no)}
-      <span class="kind ${kind}">${kind === "tool" ? "Tool" : kind === "paper" ? "Paper" : "Learning"}</span>
+      <span class="kind ${kind}">${kind === "tool" ? "Tool" : kind === "paper" ? "Paper" : kind === "doc" ? "Doc" : "Learning"}</span>
     </div>
     <div class="body">${parts.join("")}</div>
   </article>`;
