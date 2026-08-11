@@ -4,7 +4,7 @@ A private Telegram bot that turns links and topics into a searchable knowledge
 base. Send it something; it works out what kind of thing it is, extracts the
 real content, and files a structured card. The cards are published as a static
 site — **The Register** in `site/`, live at
-https://harshjain007.github.io/content-digest-bot/.
+https://harshjain007.github.io/content-digest-bot/site/index.html
 
 ## What it files
 
@@ -115,6 +115,28 @@ always shows the latest entries.
 To rebuild the site data by hand after editing the JSON:
 ```bash
 python -m content_digest_bot.store
+```
+
+## GitHub Pages (live from anywhere)
+
+The register is published automatically to GitHub Pages on **every new
+addition**. When the bot files a card it commits `site/` + `data/` and pushes
+them to the `gh-pages` branch with a descriptive message
+(`add: resource: <title>` / `add: learning: <title>`). GitHub Pages then
+redeploys within ~1 minute.
+
+- **Live URL:** https://harshjain007.github.io/content-digest-bot/site/index.html
+- Source branch: `gh-pages` (root). Managed by `store._publish_to_pages()`.
+- The Mac must be on (and the bot running) for a new save to publish — Pages
+  only updates when the bot pushes.
+- The repo is **public** so the URL works without login. Make it private from
+  the GitHub settings if you'd rather keep the register to yourself (note:
+  private-repo Pages needs a Pro/Team plan).
+
+To preview locally without waiting for the push:
+
+```bash
+python3 -m http.server        # then visit localhost:8000/site/index.html
 ```
 
 ## Running without Telegram

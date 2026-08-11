@@ -22,6 +22,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import (Application, CommandHandler, ContextTypes,
                           MessageHandler, filters)
+from telegram import Document
 
 from .config import TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY, ANTHROPIC_MODEL
 from .extractors import extract, classify, URL_RE
@@ -35,6 +36,10 @@ from .prompts import build_tool_json_prompt, build_learning_json_prompt
 # Private bot: only these Telegram user/chat IDs may use it.
 # Your chat id was observed earlier; add others as needed.
 ALLOWED_CHAT_IDS = {811501439}
+
+# Live knowledge register (GitHub Pages) — shown after every save so you can
+# open it from anywhere.
+PAGES_URL = "https://harshjain007.github.io/content-digest-bot/site/index.html"
 
 NOT_AUTHORIZED = ("🔒 This bot is private. You are not authorized to use it.")
 
@@ -204,6 +209,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status.edit_text(f"❌ Something went wrong: {e}")
 
 
+def _pages_link():
+    return f"\n\n🔗 View on the register: {PAGES_URL}"
+
+
 async def _handle_tool(update, status, github_url, article_url, article_text):
     repo = fetch_repo(github_url)
     gh_text = repo.get("readme") if repo else ""
@@ -233,7 +242,7 @@ async def _handle_tool(update, status, github_url, article_url, article_text):
     else:
         await update.message.reply_text(
             f"⚠️ Skipped — {reason} (already in your knowledge base).")
-    await update.message.reply_text(_pretty_json(entry))
+    await update.message.reply_text(_pretty_json(entry) + _pages_link())
 
 
 async def _handle_pdf(update, status, data):
@@ -275,6 +284,7 @@ async def _handle_pdf(update, status, data):
         await update.message.reply_text(
             f"⚠️ Skipped — {reason} (already in your knowledge base).")
     await _send_html(update, summary)
+    await update.message.reply_text(_pages_link(), parse_mode=ParseMode.HTML)
 
 
 async def _handle_learning(update, status, article_text, article_url):
@@ -294,7 +304,7 @@ async def _handle_learning(update, status, article_text, article_url):
     else:
         await update.message.reply_text(
             f"⚠️ Skipped — {reason} (already in your knowledge base).")
-    await update.message.reply_text(_pretty_json(entry))
+    await update.message.reply_text(_pretty_json(entry) + _pages_link())
 
 
 # ----------------------------------------------------------------- helpers
@@ -312,6 +322,53 @@ def _looks_like_learning(text):
     return sum(k in t for k in keys) >= 2
 
 
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle a PDF / .docx file sent as a Telegram attachment."""
+    doc = update.message.document
+    fname = (doc.file_name or "").lower()
+    status = await update.message.reply_text("📎 Downloading file…")
+    try:
+        tf = await doc.get_file()
+        import tempfile, os
+        suffix = ".pdf" if fname.endswith(".pdf") else \
+            ".docx" if fname.endswith(".docx") else os.path.splitext(fname)[1] or ".bin"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+            path = f.name
+        await tf.download_to_drive(path)
+        data = {"source": "Article", "title": doc.file_name or "Uploaded file",
+                "url": None, "text": None}
+        if fname.endswith(".pdf"):
+            from pypdf import PdfReader
+            with open(path, "rb") as fh:
+                reader = PdfReader(fh)
+                text = "\n\n".join((p.extract_text() or "") for p in reader.pages).strip()
+                title = (reader.metadata.title if reader.metadata else None) or doc.file_name
+            data.update({"text": text[:30000], "is_pdf": True, "title": title})
+        elif fname.endswith(".docx"):
+            import docx
+            d = docx.Document(path)
+            parts = [p.text for p in d.paragraphs if p.text.strip()]
+            for table in d.tables:
+                for row in table.rows:
+                    cells = [c.text.strip() for c in row.cells if c.text.strip()]
+                    if cells:
+                        parts.append(" | ".join(cells))
+            data.update({"text": "\n\n".join(parts).strip()[:30000], "is_doc": True})
+        else:
+            await status.edit_text("⚠️ Only PDF and .docx files are supported. "
+                                   "Re-send as one of those.")
+            os.unlink(path)
+            return
+        os.unlink(path)
+        if not data.get("text"):
+            await status.edit_text("⚠️ Couldn't extract text from that file.")
+            return
+        await _handle_pdf(update, status, data)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("document handling failed")
+        await status.edit_text(f"❌ Couldn't read that file: {e}")
+
+
 def main():
     if not TELEGRAM_BOT_TOKEN:
         print("ERROR: set TELEGRAM_BOT_TOKEN in your .env first.")
@@ -326,6 +383,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+    app.add_handler(MessageHandler(filters.Document.PDF | filters.Document.FileExtension("docx"), handle_document))
     print(f"Bot running (model={ANTHROPIC_MODEL})…  Ctrl+C to stop.")
     # launchd restarts the process on crash; a manual retry loop here can spawn
     # overlapping pollers (double getUpdates → 409), so just run once.
