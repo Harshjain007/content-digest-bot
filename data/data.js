@@ -141,6 +141,15 @@ window.REGISTER_DATA = [
     "_added": "2026-08-11T20:37:07.441532+00:00"
   },
   {
+    "title": "README_TEST_CARD",
+    "description": "verify descriptive gh-pages commit",
+    "type": "paper",
+    "links": {
+      "article": "https://example.com/r"
+    },
+    "_added": "2026-08-11T20:45:01.106129+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": "https://www.aiburnerofficial.com/resources/",
     "takeAways": [
