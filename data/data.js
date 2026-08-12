@@ -142,7 +142,9 @@ window.REGISTER_DATA = [
   },
   {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
-    "links": "https://www.aiburnerofficial.com/resources/",
+    "links": {
+      "article": "https://www.aiburnerofficial.com/resources/"
+    },
     "takeAways": [
       "Use Ditto + GSAP to clone websites with motion effects and avoid common debugging traps.",
       "Implement Vibe Coding with structured context files to maintain project consistency and AI alignment.",
@@ -155,6 +157,7 @@ window.REGISTER_DATA = [
       "Optimize AI image/video generation API usage with custom instructions to avoid unnecessary costs.",
       "Test React Native apps using Expo Go without needing Xcode or Android Studio."
     ],
-    "_added": "2026-08-07T08:14:29.873428+00:00"
+    "_added": "2026-08-07T08:14:29.873428+00:00",
+    "title": "This article provides a collection of free resources and gui"
   }
 ];
