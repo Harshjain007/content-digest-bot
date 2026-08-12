@@ -398,7 +398,7 @@ function entryHTML(item, no) {
     if (links.length) parts.push(`<div class="links">${links.join("")}</div>`);
   } else {
     parts.push(fieldHTML("What it covers", item.description));
-    const take = (item.takeAways || "").trim();
+    const take = String(item.takeAways == null ? "" : item.takeAways).trim();
     if (take.length > 2) {
       parts.push(
         `<details class="field"><summary>Takeaways</summary>` +
