@@ -163,6 +163,18 @@ window.REGISTER_DATA = [
     "_added": "2026-09-02T06:33:50.708788+00:00"
   },
   {
+    "title": "500+ AI Agent Projects & Use Cases",
+    "description": "A curated collection of 500+ AI agent projects, use cases, and working implementations across major frameworks like LangGraph, CrewAI, AutoGen, and Agno. It includes production examples, tutorials, and code for various industries such as Healthcare, Finance, Education, Cybersecurity, and more.",
+    "problem": "This repository solves the problem of finding relevant AI agent projects and use cases, helping developers, researchers, teams, and students to explore, understand, and implement AI agents efficiently without the need for complex monorepo setups.",
+    "how this works": "1. Clone the repository using `git clone https://github.com/ashishpatel26/500-AI-Agents-Projects.git`.\n2. Navigate to the `agents/` directory to find self-contained agents with their own `requirements.txt` and `.env.example` files.\n3. Run an agent by installing dependencies and configuring the `.env` file with your API keys.\n4. Explore industry-specific use cases and framework comparisons to choose the right tool for your project.\n5. Contribute by adding your own agent or improving existing implementations.",
+    "links": {
+      "github": "https://github.com/ashishpatel26/500-AI-Agents-Projects",
+      "website": "https://ashishpatel26.github.io/500-AI-Agents-Projects/",
+      "article": ""
+    },
+    "_added": "2026-09-04T18:35:25.734934+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
