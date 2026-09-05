@@ -175,6 +175,18 @@ window.REGISTER_DATA = [
     "_added": "2026-09-04T18:35:25.734934+00:00"
   },
   {
+    "title": "The Agency",
+    "description": "The Agency is a collection of AI agents designed to assist with various tasks across different domains. Each agent specializes in a specific area, such as frontend development, backend architecture, AI engineering, and more. These agents are ready to be used in tools like Claude Code, Cursor, and others to enhance productivity and streamline workflows.",
+    "problem": "The Agency solves the problem of having a one-size-fits-all AI assistant by providing specialized AI agents tailored for specific tasks. It makes life easier by allowing users to select and utilize agents that match their exact needs, improving efficiency and reducing the time spent on repetitive or complex tasks.",
+    "how this works": "1. Install the native desktop app (Agency Agents) for macOS, Linux, and Windows to browse and install agents into supported tools.\n2. Alternatively, use the command-line scripts to install agents into tools like Claude Code, Cursor, and others.\n3. Each agent has a defined role, personality, and deliverables, allowing users to activate specific agents for their tasks.\n4. For multi-tool integrations, generate integration files and install agents into the desired tools using the provided scripts.",
+    "links": {
+      "github": "https://github.com/msitarzewski/agency-agents",
+      "website": "",
+      "article": ""
+    },
+    "_added": "2026-09-05T08:04:55.373682+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
