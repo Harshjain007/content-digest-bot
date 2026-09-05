@@ -186,6 +186,18 @@
     "_added": "2026-09-05T08:04:55.373682+00:00"
   },
   {
+    "title": "AutoGPT",
+    "description": "AutoGPT is an open-source platform for building, deploying, and running AI agents that automate complex workflows. Users can describe tasks in plain English, and AutoGPT creates agents that execute these tasks autonomously, offering a visual builder for precise control over workflows.",
+    "problem": "AutoGPT solves the problem of complex task automation by allowing users to create AI agents without coding. It simplifies workflows, saves time, and reduces the need for manual intervention, making AI accessible even to non-technical users.",
+    "how this works": "1. Use the AutoGPT Platform to describe tasks in plain English or use the visual builder for detailed workflow control.\n2. AutoGPT generates an AI agent that executes the described tasks.\n3. Run agents on demand, on schedules, or from triggers.\n4. For self-hosting, install the tool using the provided scripts and configure it with your infrastructure and model API keys.",
+    "links": {
+      "github": "https://github.com/Significant-Gravitas/AutoGPT",
+      "website": "https://agpt.co",
+      "article": ""
+    },
+    "_added": "2026-09-05T13:33:24.395884+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
