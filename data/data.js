@@ -199,6 +199,18 @@ window.REGISTER_DATA = [
     "_added": "2026-09-05T13:33:24.395884+00:00"
   },
   {
+    "title": "Superpowers",
+    "description": "Superpowers is a complete software development methodology for coding agents, built on top of a set of composable skills and initial instructions that guide agents to use them effectively. It emphasizes test-driven development, systematic debugging, and collaborative workflows to streamline the software development process.",
+    "problem": "Superpowers solves the problem of inefficient and error-prone coding by providing a structured, automated approach to software development. It reduces the cognitive load on developers by handling repetitive tasks, ensuring code quality through testing and reviews, and enabling parallel development workflows, thus making the development process faster and more reliable.",
+    "how this works": "1. Start by brainstorming and refining your ideas through questions and exploring alternatives. 2. Use git worktrees to create isolated workspaces for new branches. 3. Break down the work into small, manageable tasks with exact file paths and code. 4. Use subagent-driven development to execute tasks with two-stage reviews. 5. Implement with test-driven development (RED-GREEN-REFACTOR) to ensure code quality. 6. Request code reviews and address feedback. 7. Finish the development branch by verifying tests and deciding on merge options.",
+    "links": {
+      "github": "https://github.com/obra/superpowers",
+      "website": "",
+      "article": ""
+    },
+    "_added": "2026-09-06T19:29:43.580166+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
