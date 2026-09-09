@@ -94,6 +94,9 @@ def add_resource(entry):
 
 def add_learning(entry):
     """Add a learning/article entry. Returns (added: bool, reason: str)."""
+    # Strip any spurious "type" the LLM may have injected — learning
+    # cards must be classified as "learn" by kindOf(), never "paper".
+    entry.pop("type", None)
     items = _load(LEARNINGS)
     if entry.get("links") and entry["links"] in [e.get("links") for e in items]:
         return False, "already have this article"
