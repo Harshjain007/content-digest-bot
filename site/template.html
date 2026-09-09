@@ -295,6 +295,7 @@ const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, c => ESC[c]);
 }
+/* markdown-to-HTML formatter is loaded inline (store.py writes it below). */
 
 /* Only http(s) links are ever rendered — entries are written by an LLM, so a
    javascript:/data: URL must never reach an href. Returns null if unusable. */
