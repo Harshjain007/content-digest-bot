@@ -300,14 +300,14 @@ function esc(s) {
    javascript:/data: URL must never reach an href. Returns null if unusable. */
 function safeUrl(u) {
   if (typeof u !== "string" || !u.trim()) return null;
-  // Parsed with no base: entries are model-written, so anything that isn't an
-  // absolute http(s) URL is dropped rather than resolved into a dead local link.
+  let t = u.trim();
+  // unwrap @url:`display`<url> and @url:`url` leftovers written by the
+  // extractor so they become real clickable links.
+  const m1 = t.match(/^@url:`([^`]+)`<([^>]+)>$/);
+  if (m1) t = m1[2];
+  else { const m2 = t.match(/^@url:`([^`]+)`$/); if (m2) t = m2[1]; }
   let parsed;
-  try {
-    parsed = new URL(u.trim());
-  } catch {
-    return null;
-  }
+  try { parsed = new URL(t); } catch { return null; }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
   return parsed;
 }
@@ -343,7 +343,7 @@ function stampHTML(item, no) {
 function fieldHTML(label, value) {
   const v = (value == null ? "" : String(value)).trim();
   if (v.length < 2) return "";
-  return `<div class="field"><p class="field-label">${esc(label)}</p><p>${esc(v)}</p></div>`;
+  return `<div class="field"><p class="field-label">${esc(label)}</p><p>${mdfmt(v)}</p></div>`;
 }
 
 function entryHTML(item, no) {
@@ -355,7 +355,7 @@ function entryHTML(item, no) {
     const title = (item.title || "").trim();
     if (title) parts.push(`<h2>${esc(title)}</h2>`);
     const desc = (item.description || "").trim();
-    if (desc) parts.push(`<div class="field"><p class="field-label">Full explanation</p><p>${esc(desc)}</p></div>`);
+    if (desc) parts.push(`<div class="field"><p class="field-label">Full explanation</p><p>${mdfmt(desc)}</p></div>`);
     const links = [
       linkHTML(L.article || item.links, "Source PDF"),
       linkHTML(L.website, "Website"),
@@ -367,7 +367,7 @@ function entryHTML(item, no) {
     const title = (item.title || "").trim();
     if (title) parts.push(`<h2>${esc(title)}</h2>`);
     const desc = (item.description || "").trim();
-    if (desc) parts.push(`<div class="field"><p class="field-label">Document summary</p><p>${esc(desc)}</p></div>`);
+    if (desc) parts.push(`<div class="field"><p class="field-label">Document summary</p><p>${mdfmt(desc)}</p></div>`);
     const links = [
       linkHTML(L.article || item.links, "Source document"),
       linkHTML(L.website, "Website"),
@@ -379,7 +379,7 @@ function entryHTML(item, no) {
     const title = (item.title || "").trim();
     if (title) parts.push(`<h2>${esc(title)}</h2>`);
     const desc = (item.description || "").trim();
-    if (desc) parts.push(`<p class="lede">${esc(desc)}</p>`);
+    if (desc) parts.push(`<p class="lede">${mdfmt(desc)}</p>`);
     parts.push(fieldHTML("Problem it solves", item.problem));
 
     const how = (item["how this works"] || "").trim();
@@ -402,7 +402,7 @@ function entryHTML(item, no) {
     if (take.length > 2) {
       parts.push(
         `<details class="field"><summary>Takeaways</summary>` +
-        `<p class="steps">${esc(take)}</p></details>`
+        `<p class="steps">${mdfmt(take)}</p></details>`
       );
     }
     const link = linkHTML(item.links, "Source article");
