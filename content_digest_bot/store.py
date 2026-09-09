@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +116,20 @@ def _render_site(items):
     straight off disk always shows the latest entries (file:// blocks fetch).
 
     The template (site/template.html) carries a `window.REGISTER_DATA =
-    __REGISTER_DATA__;` placeholder that we fill with the live JSON. The page
-    still tries fetch() when served over HTTP for live updates.
+    __REGISTER_DATA__;` placeholder that we fill with the live JSON. We
+    also inject the mdfmt() markdown formatter inline so the page can
+    render bullet lists, bold, headings, and @url: links properly.
     """
     if not os.path.exists(SITE_TEMPLATE):
         return
-    payload = json.dumps(items, ensure_ascii=False)
+    mdfmt_js = Path(__file__).resolve().parent.parent / "site" / "mdfmt.js"
+    mdfmt_src = mdfmt_js.read_text(encoding="utf-8") if mdfmt_js.exists() else ""
     with open(SITE_TEMPLATE, encoding="utf-8") as f:
         tpl = f.read()
+    payload = json.dumps(items, ensure_ascii=False)
     html = tpl.replace("__REGISTER_DATA__", payload)
+    html = html.replace("/* markdown-to-HTML formatter is loaded inline (store.py writes it below). */",
+                        f"<script>{mdfmt_src}</script>")
     with open(SITE_HTML, "w", encoding="utf-8") as f:
         f.write(html)
 
