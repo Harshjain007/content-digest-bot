@@ -66,29 +66,91 @@ def _similarity(a, b):
 def _is_duplicate(new_entry, existing, fields=("title", "description", "how this works", "takeAways")):
     """Return True if new_entry is too similar to an existing one."""
     for ex in existing:
-        score = max(_similarity(new_entry.get(f, ""), ex.get(f, ""))
-                    for f in fields if new_entry.get(f) and ex.get(f))
+        # `default` matters: two entries can share no comparable field at all
+        # (a learning card against a paper card), and max() over an empty
+        # generator raises instead of scoring zero.
+        score = max((_similarity(new_entry.get(f, ""), ex.get(f, ""))
+                     for f in fields if new_entry.get(f) and ex.get(f)),
+                    default=0.0)
         if score >= 0.55:
             return True
     return False
 
 
+def norm_links(entry):
+    """An entry's links as a dict, whatever shape the model wrote.
+
+    The learning prompt yields a bare URL string about half the time and a
+    dict the rest, which left every reader downstream handling both. Normalize
+    once, here, so nothing else has to.
+    """
+    links = entry.get("links")
+    if isinstance(links, str):
+        return {"article": links}
+    return links if isinstance(links, dict) else {}
+
+
+def _canon_url(url):
+    """Canonical form of a URL for comparison — same page, same key.
+
+    Ignores scheme, `www.`, a trailing slash and a trailing `.git`, so
+    `http://GitHub.com/a/b.git` and `https://github.com/a/b/` collapse to one.
+    """
+    u = (url or "").strip().lower()
+    if not u:
+        return ""
+    u = re.sub(r"^https?://", "", u)
+    u = re.sub(r"^www\.", "", u)
+    u = u.rstrip("/")
+    return re.sub(r"\.git$", "", u)
+
+
+def _entry_urls(entry):
+    """Every canonical URL an entry points at."""
+    return {c for c in (_canon_url(v) for v in norm_links(entry).values()) if c}
+
+
+def _all_entries():
+    """Both stores together. An entry is a duplicate of anything already
+    filed, not just of things filed into the same lane."""
+    return _load(RESOURCES) + _load(LEARNINGS)
+
+
+def duplicate_reason(entry, existing=None):
+    """Why `entry` is already in the knowledge base, or None if it is new.
+
+    Runs before every save, so the same link filed twice never creates a
+    second card. Three passes, cheapest first:
+      1. a shared link, checked across BOTH stores — a repo filed as a tool
+         must not come back later as a learning
+      2. an identical title
+      3. keyword overlap across the substantive fields
+    """
+    if existing is None:
+        existing = _all_entries()
+    urls = _entry_urls(entry)
+    title = (entry.get("title") or "").strip().lower()
+    for ex in existing:
+        if urls and urls & _entry_urls(ex):
+            return "already filed under this link"
+        if title and title == (ex.get("title") or "").strip().lower():
+            return "already have an entry with this title"
+    if _is_duplicate(entry, existing):
+        return "too similar to an existing entry"
+    return None
+
+
 def add_resource(entry):
     """Add a tool/repo entry. Returns (added: bool, reason: str)."""
-    items = _load(RESOURCES)
-    # dedup by title OR url
-    for ex in items:
-        if entry.get("title") and ex.get("title") == entry.get("title"):
-            return False, "already have a tool with this name"
-        if entry.get("links", {}).get("github") and \
-           ex.get("links", {}).get("github") == entry["links"]["github"]:
-            return False, "already have this repo"
-    if _is_duplicate(entry, items):
-        return False, "too similar to an existing resource"
+    entry["links"] = norm_links(entry)
+    reason = duplicate_reason(entry)
+    if reason:
+        return False, reason
     entry["_added"] = datetime.now(timezone.utc).isoformat()
+    items = _load(RESOURCES)
     items.append(entry)
     _save(RESOURCES, items)
-    _regen(f"resource: {entry.get('title') or entry.get('links', {}).get('github') or 'entry'}")
+    _regen(f"resource: {entry.get('title') or entry['links'].get('github') or 'entry'}")
     return True, "added"
 
 
@@ -97,12 +159,12 @@ def add_learning(entry):
     # Strip any spurious "type" the LLM may have injected — learning
     # cards must be classified as "learn" by kindOf(), never "paper".
     entry.pop("type", None)
-    items = _load(LEARNINGS)
-    if entry.get("links") and entry["links"] in [e.get("links") for e in items]:
-        return False, "already have this article"
-    if _is_duplicate(entry, items, fields=("description", "takeAways")):
-        return False, "too similar to an existing learning"
+    entry["links"] = norm_links(entry)
+    reason = duplicate_reason(entry)
+    if reason:
+        return False, reason
     entry["_added"] = datetime.now(timezone.utc).isoformat()
+    items = _load(LEARNINGS)
     items.append(entry)
     _save(LEARNINGS, items)
     title = entry.get("title") or (entry.get("description") or "")
@@ -131,8 +193,7 @@ def _render_site(items):
         tpl = f.read()
     payload = json.dumps(items, ensure_ascii=False)
     html = tpl.replace("__REGISTER_DATA__", payload)
-    html = html.replace("/* markdown-to-HTML formatter is loaded inline (store.py writes it below). */",
-                        f"<script>{mdfmt_src}</script>")
+    html = html.replace("<!--MDFMT-->", f"<script>\n{mdfmt_src}\n</script>")
     with open(SITE_HTML, "w", encoding="utf-8") as f:
         f.write(html)
 
@@ -177,6 +238,8 @@ def _publish_to_pages(commit_msg="update knowledge register"):
     GitHub Pages site reflects the latest save. Best-effort: failures are
     logged but never break the bot's main flow.
     """
+    if os.getenv("CDB_NO_PUBLISH"):
+        return
     if not os.path.isdir(os.path.join(REPO_ROOT, ".git")):
         return
     ok, out = _run_git(["add", "site", "data"], REPO_ROOT)
@@ -199,3 +262,36 @@ def _publish_to_pages(commit_msg="update knowledge register"):
         logger.warning("Pages publish: push failed: %s", out)
         return
     logger.info("Published site to GitHub Pages (gh-pages).")
+
+
+def dedupe(dry_run=False):
+    """Rebuild both stores keeping only the first copy of each entry.
+
+    The dedup checks run on save, so a store only carries duplicates that
+    predate them. Run this once after changing the rules:
+        python -m content_digest_bot.store --dedupe
+    Returns the list of (store, title, reason) that were dropped.
+    """
+    dropped = []
+    for path in (RESOURCES, LEARNINGS):
+        kept = []
+        for entry in _load(path):
+            entry["links"] = norm_links(entry)
+            reason = duplicate_reason(entry, kept)
+            if reason:
+                dropped.append((os.path.basename(path),
+                                entry.get("title") or "(untitled)", reason))
+            else:
+                kept.append(entry)
+        if not dry_run:
+            _save(path, kept)
+    return dropped
+
+
+if __name__ == "__main__":
+    import sys
+    if "--dedupe" in sys.argv:
+        for store, title, reason in dedupe():
+            print(f"  dropped [{store}] {title[:60]} — {reason}")
+    _regen()
+    print(f"Wrote {COMBINED}, {COMBINED_JS} and {SITE_HTML}.")

@@ -14,8 +14,28 @@ https://harshjain007.github.io/content-digest-bot/site/index.html
 | **Learning** | an upskilling / productivity / career article | `data/learnings.json` — description, takeaways, link |
 | **Concept** | a topic, YouTube video, or other AI content | not saved — replies with a summary in chat, then a full deep-dive if you reply "yes" |
 
-Tool and Learning entries are de-duplicated before saving, then mirrored into
-`data/data.json` (and `data/data.js`) for the site.
+### De-duplication
+
+Nothing is filed twice. Before any save, a candidate entry is checked against
+**both** stores together, cheapest test first:
+
+1. **Shared link** — every URL on the entry is canonicalized (scheme, `www.`,
+   a trailing `/` and a trailing `.git` are ignored, case folded), so
+   `http://GitHub.com/a/b.git` and `https://github.com/a/b/` are one link.
+   Checked across both stores, so a repo filed as a tool can't come back as a
+   learning card.
+2. **Identical title.**
+3. **Keyword overlap** on the substantive fields, at 55% Jaccard similarity.
+
+The bot replies with which of the three caught it. To clean duplicates that
+predate these rules:
+
+```bash
+python -m content_digest_bot.store --dedupe
+```
+
+Saved entries are mirrored into `data/data.json` (and `data/data.js`) for the
+site.
 
 ## Layout
 
@@ -117,6 +137,11 @@ To rebuild the site data by hand after editing the JSON:
 python -m content_digest_bot.store
 ```
 
+`store.py` renders `site/index.html` from `site/template.html`, inlining
+`site/mdfmt.js` and embedding the data. Edit the **template**, never
+`index.html` — it is generated and overwritten on every save. Set
+`CDB_NO_PUBLISH=1` to regenerate without pushing to `gh-pages`.
+
 ## GitHub Pages (live from anywhere)
 
 The register is published automatically to GitHub Pages on **every new
@@ -152,6 +177,7 @@ Prints the brief and saves it to `notes/`.
 ```bash
 python -m tests.test_units           # offline: classify, dedup, formatting
 python -m tests.test_site_security   # offline: the site's XSS defences
+node tests/test_mdfmt.cjs            # offline: the markdown renderer's escaping
 python -m tests.test_extractors      # hits the network (YouTube + Wikipedia)
 ```
 
