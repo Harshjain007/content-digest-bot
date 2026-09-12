@@ -229,6 +229,18 @@
     "_added": "2026-09-11T03:52:38.572102+00:00"
   },
   {
+    "title": "webadderallorg",
+    "description": "",
+    "problem": "",
+    "how this works": "",
+    "links": {
+      "github": "https://github.com/webadderallorg/",
+      "website": "",
+      "article": ""
+    },
+    "_added": "2026-09-12T19:43:06.869875+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
