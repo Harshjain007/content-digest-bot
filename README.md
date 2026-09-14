@@ -119,6 +119,39 @@ per bot, and a second instance will Conflict and kill both.
 pkill -9 -f content_digest_bot.bot
 ```
 
+### 7. Keep it running (macOS launchd)
+
+A LaunchAgent starts the bot at login and restarts it if it dies, so the
+register keeps filling without a terminal open:
+`~/Library/LaunchAgents/com.harshjain.contentdigestbot.plist`
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.harshjain.contentdigestbot   # restart
+launchctl bootout   gui/$(id -u)/com.harshjain.contentdigestbot      # stop
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.harshjain.contentdigestbot.plist
+launchctl list | grep contentdigest                                  # pid / last exit
+tail -f ~/Library/Logs/content-digest-bot/bot.err.log                # logs
+```
+
+Two things that are easy to get wrong:
+
+- **Logs live outside the project** (`~/Library/Logs/content-digest-bot/`).
+  The repo sits under `~/Documents`, and macOS privacy protection (TCC) blocks
+  *launchd itself* from creating files there, so a `StandardOutPath` inside the
+  project makes the job fail at load with exit code 78 and no output. The bot
+  process can read and write the project fine — only launchd's own log
+  creation is blocked. `./run.sh -d` still writes `bot.log` in the project for
+  manual runs.
+- **The agent runs `.venv/bin/python3` directly**, not `run.sh`. KeepAlive
+  already guarantees a single instance, so run.sh's kill-and-relaunch is
+  redundant there. The venv is built with `--copies` so that interpreter is a
+  real binary rather than a symlink into the system framework.
+
+If you move the project, three things must be redone: the paths in the plist,
+the venv (`rm -rf .venv && python3 -m venv --copies .venv && .venv/bin/python
+-m pip install -r requirements.txt` — a venv bakes in absolute paths), and a
+reload of the agent.
+
 ## The Register (the site)
 
 Open `site/index.html` directly, or serve the repo root:
