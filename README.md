@@ -14,6 +14,20 @@ https://harshjain007.github.io/content-digest-bot/site/index.html
 | **Learning** | an upskilling / productivity / career article | `data/learnings.json` — description, takeaways, link |
 | **Concept** | a topic, YouTube video, or other AI content | not saved — replies with a summary in chat, then a full deep-dive if you reply "yes" |
 
+### Documents
+
+PDFs, Word, PowerPoint, Excel, CSV and HTML — sent as a link or as a Telegram
+attachment — are converted to **Markdown** by
+[MarkItDown](https://github.com/microsoft/markitdown) before the model sees
+them, so heading levels, lists and tables survive as structure instead of being
+flattened into anonymous paragraphs. One converter (`extractors.to_markdown`)
+handles every document, whether it arrived as a URL or an upload, so both
+routes produce identical input.
+
+Note that Markdown conversion is about **fidelity, not token count** — for a
+PDF it yields about the same volume of text as raw extraction. `MAX_INPUT_CHARS`
+is what actually bounds what you spend per document.
+
 ### De-duplication
 
 Nothing is filed twice. Before any save, a candidate entry is checked against
@@ -34,8 +48,7 @@ predate these rules:
 python -m content_digest_bot.store --dedupe
 ```
 
-Saved entries are mirrored into `data/data.json` (and `data/data.js`) for the
-site.
+Saved entries are mirrored into `data/data.json` for the site.
 
 ## Layout
 
@@ -81,7 +94,7 @@ cp .env.example .env
 | `ANTHROPIC_MODEL` | defaults to `claude-3-5-sonnet-latest` |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | used when `LLM_PROVIDER=ollama` |
 | `INSTAGRAM_USERNAME` / `PASSWORD` | optional; without them the bot asks you to paste a reel's caption |
-| `MAX_INPUT_CHARS` | cap on extracted text sent to the model (default 30000) |
+| `MAX_INPUT_CHARS` | hard cap on the Markdown sent to the model, in characters (default 30000). This is the token dial — roughly 4 chars per token. |
 
 `.env` holds live secrets and is git-ignored. Never commit it — `.env.example`
 is the template to share.
@@ -161,9 +174,9 @@ python3 -m http.server        # then visit localhost:8000/site/index.html
 ```
 
 Both work. Opening the file straight off disk can't use `fetch` (browsers block
-it on `file://`), so `store.py` also writes `data/data.js`, which the page falls
-back to. When served over HTTP the page reads `data/data.json` instead, so it
-always shows the latest entries.
+it on `file://`), so `store.py` embeds the data directly into `site/index.html`
+when it renders it. When served over HTTP the page reads `data/data.json`
+instead, so it always shows the latest entries.
 
 To rebuild the site data by hand after editing the JSON:
 ```bash

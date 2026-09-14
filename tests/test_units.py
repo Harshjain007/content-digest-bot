@@ -143,6 +143,47 @@ def test_dedupe_cleans_existing(tmpdir):
     assert [e["title"] for e in kept] == ["Flask", "Django"]
 
 
+def test_to_markdown_preserves_structure():
+    """Documents reach the model as Markdown, not flattened text.
+
+    Heading levels and tables are the structure the model actually uses; the
+    old per-format parsing threw both away.
+    """
+    import io
+    import docx
+    from content_digest_bot.extractors import to_markdown
+
+    d = docx.Document()
+    d.add_heading("Quarterly Review", 1)
+    d.add_heading("Revenue", 2)
+    d.add_paragraph("Revenue grew across all regions.")
+    t = d.add_table(rows=2, cols=2)
+    for r, row in enumerate([["Region", "Q1"], ["EMEA", "120"]]):
+        for c, v in enumerate(row):
+            t.rows[r].cells[c].text = v
+    buf = io.BytesIO()
+    d.save(buf)
+
+    md, _ = to_markdown(buf.getvalue(), ".docx")
+    assert "# Quarterly Review" in md          # h1 survives as h1
+    assert "## Revenue" in md                  # h2 is distinguishable from h1
+    assert "| Region | Q1 |" in md             # a real markdown table
+    assert "| --- |" in md
+
+    # the cap is honoured, so MAX_INPUT_CHARS actually bounds token spend
+    short, _ = to_markdown(buf.getvalue(), ".docx", max_chars=20)
+    assert len(short) == 20
+
+    # unreadable input raises rather than sending noise to the model
+    try:
+        to_markdown(b"not a document", ".docx")
+        raise AssertionError("expected a failure on garbage input")
+    except AssertionError:
+        raise
+    except Exception:
+        pass
+
+
 def main():
     with tempfile.TemporaryDirectory() as tmp:
         for name, fn in sorted(globals().items()):

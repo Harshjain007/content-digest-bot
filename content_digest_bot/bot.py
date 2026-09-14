@@ -16,16 +16,14 @@ HTML viewer in site/.
 import logging
 import os
 import re
-from datetime import datetime, timezone
 
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import (Application, CommandHandler, ContextTypes,
                           MessageHandler, filters)
-from telegram import Document
 
-from .config import TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY, ANTHROPIC_MODEL
-from .extractors import extract, classify, URL_RE
+from .config import TELEGRAM_BOT_TOKEN, ANTHROPIC_MODEL
+from .extractors import extract, classify, to_markdown, URL_RE
 from .github_api import is_github_url, fetch_repo
 from .synthesize import synthesize, synthesize_json
 from .format_telegram import md_to_telegram_html, split_html
@@ -41,6 +39,9 @@ ALLOWED_CHAT_IDS = {811501439}
 # open it from anywhere.
 PAGES_URL = "https://harshjain007.github.io/content-digest-bot/site/index.html"
 
+# Attachment types MarkItDown can turn into Markdown for us.
+SUPPORTED_DOC_TYPES = {".pdf", ".docx", ".pptx", ".xlsx", ".csv", ".html", ".htm"}
+
 NOT_AUTHORIZED = ("🔒 This bot is private. You are not authorized to use it.")
 
 logging.basicConfig(
@@ -51,10 +52,6 @@ logging.basicConfig(
 # which grows the log by megabytes a day and leaks the token to disk.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
-
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NOTES_DIR = os.path.join(REPO_ROOT, "notes")
-os.makedirs(NOTES_DIR, exist_ok=True)
 
 HELP = (
     "I'm your AI knowledge-keeper. Share:\n"
@@ -328,50 +325,38 @@ def _looks_like_learning(text):
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle a PDF / .docx file sent as a Telegram attachment."""
+    """Handle a document sent as a Telegram attachment.
+
+    Goes through the same MarkItDown converter as a document URL, so an
+    attachment and a link to the same file produce identical Markdown.
+    """
+    if update.effective_chat.id not in ALLOWED_CHAT_IDS:
+        await update.message.reply_text(NOT_AUTHORIZED)
+        return
+
     doc = update.message.document
-    fname = (doc.file_name or "").lower()
-    status = await update.message.reply_text("📎 Downloading file…")
+    fname = (doc.file_name or "")
+    suffix = os.path.splitext(fname)[1].lower()
+    if suffix not in SUPPORTED_DOC_TYPES:
+        await update.message.reply_text(
+            "⚠️ I can read " + ", ".join(sorted(SUPPORTED_DOC_TYPES)) +
+            ". Re-send as one of those.")
+        return
+
+    status = await update.message.reply_text("📎 Reading file…")
     try:
         tf = await doc.get_file()
-        import tempfile, os
-        suffix = ".pdf" if fname.endswith(".pdf") else \
-            ".docx" if fname.endswith(".docx") else os.path.splitext(fname)[1] or ".bin"
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-            path = f.name
-        await tf.download_to_drive(path)
-        data = {"source": "Article", "title": doc.file_name or "Uploaded file",
-                "url": None, "text": None}
-        if fname.endswith(".pdf"):
-            from pypdf import PdfReader
-            with open(path, "rb") as fh:
-                reader = PdfReader(fh)
-                text = "\n\n".join((p.extract_text() or "") for p in reader.pages).strip()
-                title = (reader.metadata.title if reader.metadata else None) or doc.file_name
-            data.update({"text": text[:30000], "is_pdf": True, "title": title})
-        elif fname.endswith(".docx"):
-            import docx
-            d = docx.Document(path)
-            parts = [p.text for p in d.paragraphs if p.text.strip()]
-            for table in d.tables:
-                for row in table.rows:
-                    cells = [c.text.strip() for c in row.cells if c.text.strip()]
-                    if cells:
-                        parts.append(" | ".join(cells))
-            data.update({"text": "\n\n".join(parts).strip()[:30000], "is_doc": True})
-        else:
-            await status.edit_text("⚠️ Only PDF and .docx files are supported. "
-                                   "Re-send as one of those.")
-            os.unlink(path)
-            return
-        os.unlink(path)
-        if not data.get("text"):
-            await status.edit_text("⚠️ Couldn't extract text from that file.")
-            return
-        await _handle_pdf(update, status, data)
+        raw = bytes(await tf.download_as_bytearray())
+        text, title = to_markdown(raw, suffix)
     except Exception as e:  # noqa: BLE001
         logger.exception("document handling failed")
         await status.edit_text(f"❌ Couldn't read that file: {e}")
+        return
+
+    data = {"source": "Article", "url": None, "text": text,
+            "title": title or fname or "Uploaded file",
+            "is_doc": suffix != ".pdf", "is_pdf": suffix == ".pdf"}
+    await _handle_pdf(update, status, data)
 
 
 def main():
@@ -388,7 +373,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
-    app.add_handler(MessageHandler(filters.Document.PDF | filters.Document.FileExtension("docx"), handle_document))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     print(f"Bot running (model={ANTHROPIC_MODEL})…  Ctrl+C to stop.")
     # launchd restarts the process on crash; a manual retry loop here can spawn
     # overlapping pollers (double getUpdates → 409), so just run once.

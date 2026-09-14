@@ -77,10 +77,6 @@ def md_to_telegram_html(md):
     return "\n".join(out)
 
 
-def _strip_tags(html):
-    return re.sub(r"<[^>]+>", "", html)
-
-
 def split_html(html, limit=3800):
     """Split HTML into balanced chunks that Telegram will accept.
 

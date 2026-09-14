@@ -15,6 +15,8 @@ Each extractor returns a dict:
 import logging
 import re
 
+from .config import MAX_INPUT_CHARS
+
 logger = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://[^\s]+", re.IGNORECASE)
@@ -70,7 +72,7 @@ def _yt_transcript(vid):
         return None
 
 
-def extract_youtube(url, max_chars=30000):
+def extract_youtube(url, max_chars=MAX_INPUT_CHARS):
     vid = _youtube_id(url)
     title, description = _yt_metadata(url)
     transcript = _yt_transcript(vid) if vid else None
@@ -106,34 +108,37 @@ def _fetch_bytes(url, timeout=30):
         return None, None
 
 
-def extract_pdf(url, max_chars=30000):
-    """Extract text from a PDF URL via pypdf."""
-    raw, ctype = _fetch_bytes(url)
+def to_markdown(raw, suffix, max_chars=MAX_INPUT_CHARS):
+    """Convert a document's bytes to Markdown for the model.
+
+    One converter for every document the bot sees, whether it arrived as a URL
+    or as a Telegram attachment. MarkItDown keeps the structure the model
+    actually needs — heading levels, real tables, lists — where the previous
+    per-format parsing flattened all of it into anonymous paragraphs.
+
+    Returns (markdown, title) with title None when the file carries none.
+    Raises on failure so callers can fall back to their own error message.
+    """
+    import io
+    from markitdown import MarkItDown
+
+    res = MarkItDown().convert_stream(io.BytesIO(raw), file_extension=suffix)
+    text = (res.text_content or "").strip()
+    if len(text) < 50:
+        raise RuntimeError(f"too little text extracted from {suffix}")
+    return text[:max_chars], (getattr(res, "title", None) or "").strip() or None
+
+
+def extract_pdf(url, max_chars=MAX_INPUT_CHARS):
+    """Fetch a PDF URL and hand back its Markdown."""
+    raw, _ = _fetch_bytes(url)
     if not raw:
         return {"source": "Article", "title": "PDF link", "url": url,
                 "text": None, "failed": True}
     try:
-        from pypdf import PdfReader
-        import io
-        reader = PdfReader(io.BytesIO(raw))
-        parts = []
-        for page in reader.pages:
-            try:
-                parts.append(page.extract_text() or "")
-            except Exception:  # noqa: BLE001
-                continue
-        text = "\n\n".join(p for p in parts if p).strip()
-        title = (reader.metadata.title if reader.metadata
-                 else None) or url
-        if len(text) < 100:
-            raise RuntimeError("Too little text extracted from PDF")
-        return {
-            "source": "Article",
-            "title": title,
-            "url": url,
-            "text": text[:max_chars],
-            "is_pdf": True,
-        }
+        text, title = to_markdown(raw, ".pdf", max_chars)
+        return {"source": "Article", "title": title or url, "url": url,
+                "text": text, "is_pdf": True}
     except Exception as e:  # noqa: BLE001
         logger.warning("PDF extraction failed for %s: %s", url, e)
         return {"source": "Article", "title": "PDF link", "url": url,
@@ -151,11 +156,11 @@ def _is_doc(url, content_type=None):
         "application/vnd.openxmlformats-officedocument.wordprocessingml" in ct
 
 
-def extract_doc(url, max_chars=30000):
-    """Extract text from a Word document (.docx) URL via python-docx.
+def extract_doc(url, max_chars=MAX_INPUT_CHARS):
+    """Fetch a Word document URL and hand back its Markdown.
 
-    .docx is fully supported. Legacy .doc (binary) is not readable by
-    python-docx — we flag it so the bot can tell the user.
+    .docx is fully supported. Legacy .doc (binary) is not readable — we flag
+    it so the bot can tell the user.
     """
     if url and url.lower().split("?")[0].endswith(".doc") and \
             not url.lower().endswith(".docx"):
@@ -164,39 +169,21 @@ def extract_doc(url, max_chars=30000):
                 "failed": True,
                 "note": "Legacy .doc files aren't supported — please "
                         "re-save as .docx and reshare."}
-    raw, ctype = _fetch_bytes(url)
+    raw, _ = _fetch_bytes(url)
     if not raw:
         return {"source": "Article", "title": "Word doc", "url": url,
                 "text": None, "failed": True}
     try:
-        import docx
-        import io
-        doc = docx.Document(io.BytesIO(raw))
-        parts = [p.text for p in doc.paragraphs if p.text.strip()]
-        # Also pull tables (common in docs).
-        for table in doc.tables:
-            for row in table.rows:
-                cells = [c.text.strip() for c in row.cells if c.text.strip()]
-                if cells:
-                    parts.append(" | ".join(cells))
-        text = "\n\n".join(parts).strip()
-        title = (doc.core_properties.title or "").strip() or url
-        if len(text) < 50:
-            raise RuntimeError("Too little text extracted from document")
-        return {
-            "source": "Article",
-            "title": title,
-            "url": url,
-            "text": text[:max_chars],
-            "is_doc": True,
-        }
+        text, title = to_markdown(raw, ".docx", max_chars)
+        return {"source": "Article", "title": title or url, "url": url,
+                "text": text, "is_doc": True}
     except Exception as e:  # noqa: BLE001
         logger.warning("DOC extraction failed for %s: %s", url, e)
         return {"source": "Article", "title": "Word doc", "url": url,
                 "text": None, "failed": True}
 
 
-def extract_article(url, max_chars=30000):
+def extract_article(url, max_chars=MAX_INPUT_CHARS):
     # PDFs and PDF-like responses go through the PDF extractor.
     raw_head, ctype = _fetch_bytes(url)
     if raw_head is not None and _is_doc(url, ctype):
@@ -232,7 +219,7 @@ def _ig_shortcode(url):
     return m.group(1) if m else None
 
 
-def extract_instagram(url, username=None, password=None, max_chars=30000):
+def extract_instagram(url, username=None, password=None, max_chars=MAX_INPUT_CHARS):
     try:
         import instaloader
         shortcode = _ig_shortcode(url)
