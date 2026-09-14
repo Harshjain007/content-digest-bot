@@ -242,6 +242,18 @@ window.REGISTER_DATA = [
     "_added": "2026-09-12T19:43:06.869875+00:00"
   },
   {
+    "title": "Archify",
+    "description": "Archify is a tool that transforms a codebase or system description into a polished, interactive system map directly in chat. It supports agents like Cursor, Claude Code, Codex CLI, and OpenCode, producing typed JSON IR that is deterministically compiled into HTML/SVG for visualization.",
+    "problem": "Archify solves the problem of creating and maintaining complex system diagrams by providing an intuitive way to describe systems, validate architecture changes, and generate shareable, interactive visualizations. It simplifies the process of reviewing and presenting system architecture, making it easier to track changes, compare versions, and ensure clarity across teams.",
+    "how this works": "1. Install Archify using `npx skills add tt-a1i/archify -g` or via other supported methods.\n2. Describe your system or codebase in a chat, and Archify generates a typed JSON IR.\n3. Validate the JSON IR to ensure it meets schema and layout rules.\n4. Preview the diagram in a local session or generate a shareable HTML/SVG output.\n5. Use the interactive features to explore, compare, and refine the architecture as needed.",
+    "links": {
+      "github": "https://github.com/tt-a1i/archify",
+      "website": "https://tt-a1i.github.io/archify/",
+      "article": ""
+    },
+    "_added": "2026-09-14T04:39:21.308718+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
