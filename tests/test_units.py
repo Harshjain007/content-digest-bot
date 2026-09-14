@@ -56,7 +56,6 @@ def test_dedup_and_store(tmpdir):
     store.COMBINED = os.path.join(tmpdir, "data.json")
     # Keep the run entirely inside tmpdir: without these the test would
     # rewrite the real site and push it to gh-pages.
-    store.COMBINED_JS = os.path.join(tmpdir, "data.js")
     store.SITE_HTML = os.path.join(tmpdir, "index.html")
     store.SITE_TEMPLATE = os.path.join(tmpdir, "missing-template.html")
     store._publish_to_pages = lambda *a, **k: None
@@ -182,6 +181,75 @@ def test_to_markdown_preserves_structure():
         raise
     except Exception:
         pass
+
+
+def test_document_title_falls_back_to_heading():
+    """A document card must not be titled with its own URL.
+
+    MarkItDown carries no title: pdfminer exposes no metadata and the docx
+    path goes through mammoth, which drops core properties. Without a fallback
+    every paper filed by link was titled "https://arxiv.org/pdf/..." — which
+    also collapses title-based de-duplication down to URL matching.
+    """
+    import io
+    import docx
+    from content_digest_bot.extractors import extract_document, _md_title
+
+    d = docx.Document()
+    d.core_properties.title = "Ignored By Mammoth"
+    d.add_heading("Attention Is All You Need", 1)
+    d.add_paragraph("We propose a new simple network architecture. " * 4)
+    buf = io.BytesIO()
+    d.save(buf)
+
+    entry = extract_document(buf.getvalue(), ".docx",
+                             url="https://example.com/paper.docx")
+    assert entry["title"] == "Attention Is All You Need", entry["title"]
+    assert entry["suffix"] == ".docx" and entry["is_doc"] and not entry["is_pdf"]
+
+    # no heading at all -> fall back to the URL rather than inventing one
+    assert _md_title("just body text, no heading") is None
+    assert _md_title("## Second level still counts") == "Second level still counts"
+
+    # unreadable bytes fail cleanly instead of raising at the call site
+    bad = extract_document(b"not a document", ".docx", url="https://x.test/a")
+    assert bad["failed"] and bad["text"] is None
+
+
+def test_pdf_title_read_from_metadata():
+    """A PDF is titled from its own /Title, not from its URL.
+
+    MarkItDown's pdfminer backend exposes no metadata and a PDF's Markdown has
+    no `#` heading to fall back on, so without this every paper filed by link
+    was titled "https://arxiv.org/pdf/...".
+    """
+    from content_digest_bot.extractors import _pdf_title
+
+    pdf = (b"%PDF-1.4\n"
+           b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+           b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+           b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
+           b"4 0 obj<</Title(Attention Is All You Need)>>endobj\n"
+           b"trailer<</Root 1 0 R/Info 4 0 R>>\n%%EOF\n")
+    assert _pdf_title(pdf) == "Attention Is All You Need"
+    # unreadable input must not raise — it is only ever a nice-to-have
+    assert _pdf_title(b"not a pdf at all") is None
+
+
+def test_doc_suffix_routing():
+    """Link route and upload route accept the same set of formats."""
+    from content_digest_bot.extractors import doc_suffix, DOC_SUFFIXES
+
+    assert doc_suffix("https://x.test/deck.pptx") == ".pptx"
+    assert doc_suffix("https://x.test/sheet.XLSX") == ".xlsx"
+    assert doc_suffix("https://x.test/paper.pdf?download=1") == ".pdf"
+    assert doc_suffix("https://x.test/post") is None
+    # arXiv links carry no extension at all — they are routed by what the
+    # server says it served, which is why the content-type arm has to exist.
+    assert doc_suffix("https://arxiv.org/pdf/2309.06180") is None
+    assert doc_suffix("https://arxiv.org/pdf/2309.06180",
+                      "application/pdf") == ".pdf"
+    assert ".pptx" in DOC_SUFFIXES and ".xlsx" in DOC_SUFFIXES
 
 
 def main():

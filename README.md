@@ -16,13 +16,18 @@ https://harshjain007.github.io/content-digest-bot/site/index.html
 
 ### Documents
 
-PDFs, Word, PowerPoint, Excel, CSV and HTML — sent as a link or as a Telegram
-attachment — are converted to **Markdown** by
+PDFs, Word, PowerPoint, Excel and CSV — sent as a link or as a Telegram
+attachment, both routed through the same code — are converted to **Markdown** by
 [MarkItDown](https://github.com/microsoft/markitdown) before the model sees
 them, so heading levels, lists and tables survive as structure instead of being
 flattened into anonymous paragraphs. One converter (`extractors.to_markdown`)
 handles every document, whether it arrived as a URL or an upload, so both
-routes produce identical input.
+routes produce identical input, and a link is fetched once rather than
+downloaded again per format.
+
+A document with no title of its own is named from its first Markdown heading
+(MarkItDown exposes no metadata), falling back to the URL only when there is
+no heading at all.
 
 Note that Markdown conversion is about **fidelity, not token count** — for a
 PDF it yields about the same volume of text as raw extraction. `MAX_INPUT_CHARS`
@@ -221,7 +226,8 @@ Prints the brief and saves it to `notes/`.
 ## Tests
 
 ```bash
-python -m tests.test_units           # offline: classify, dedup, formatting
+pip install -r requirements-dev.txt   # test-only deps (python-docx fixtures)
+python -m tests.test_units           # offline: classify, dedup, docs, formatting
 python -m tests.test_site_security   # offline: the site's XSS defences
 node tests/test_mdfmt.cjs            # offline: the markdown renderer's escaping
 python -m tests.test_extractors      # hits the network (YouTube + Wikipedia)

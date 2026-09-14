@@ -88,10 +88,18 @@ def extract_youtube(url, max_chars=MAX_INPUT_CHARS):
 
 
 # ----------------------------------------------------------------- Article
-def _is_pdf(url, content_type=None):
-    if url and url.lower().split("?")[0].endswith(".pdf"):
-        return True
-    return bool(content_type) and "application/pdf" in content_type.lower()
+# Everything MarkItDown turns into Markdown for us. Kept in one place so the
+# link route and the upload route accept exactly the same set.
+DOC_SUFFIXES = (".pdf", ".docx", ".pptx", ".xlsx", ".csv", ".html", ".htm")
+
+# Content types worth trusting when a URL has no useful extension.
+_CTYPE_SUFFIX = (
+    ("application/pdf", ".pdf"),
+    ("wordprocessingml", ".docx"),
+    ("presentationml", ".pptx"),
+    ("spreadsheetml", ".xlsx"),
+    ("text/csv", ".csv"),
+)
 
 
 def _fetch_bytes(url, timeout=30):
@@ -104,8 +112,64 @@ def _fetch_bytes(url, timeout=30):
         r.raise_for_status()
         return r.content, r.headers.get("Content-Type", "")
     except Exception as e:  # noqa: BLE001
-        logger.warning("PDF fetch failed for %s: %s", url, e)
+        logger.warning("Fetch failed for %s: %s", url, e)
         return None, None
+
+
+def doc_suffix(url, content_type=None):
+    """Which document type a URL points at, or None if it isn't one."""
+    u = (url or "").lower().split("?")[0]
+    for suf in DOC_SUFFIXES:
+        if u.endswith(suf):
+            return suf
+    ct = (content_type or "").lower()
+    for needle, suf in _CTYPE_SUFFIX:
+        if needle in ct:
+            return suf
+    return None
+
+
+def _pdf_title(raw):
+    """A PDF's own /Title, which MarkItDown discards.
+
+    pdfminer.six is already installed as MarkItDown's PDF backend, so reading
+    the metadata costs no new dependency. Titles are often UTF-16, which is
+    what decode_text handles.
+    """
+    import io
+    try:
+        from pdfminer.pdfdocument import PDFDocument
+        from pdfminer.pdfparser import PDFParser
+        from pdfminer.utils import decode_text
+        for info in PDFDocument(PDFParser(io.BytesIO(raw))).info or []:
+            title = info.get("Title")
+            if isinstance(title, bytes):
+                title = decode_text(title)
+            title = (title or "").strip()
+            if len(title) > 3:
+                return title[:160]
+    except Exception as e:  # noqa: BLE001
+        logger.debug("No PDF title: %s", e)
+    return None
+
+
+def _md_title(markdown):
+    """The document's own first heading — MarkItDown carries no title.
+
+    pdfminer returns no metadata at all and the docx path goes through
+    mammoth, which drops core properties, so the heading is the only title
+    the document still has. Without this every card is titled with its URL,
+    which also collapses title-based de-duplication.
+    """
+    for line in (markdown or "").splitlines():
+        line = line.strip()
+        if line.startswith("#"):
+            title = line.lstrip("#").strip()
+            if title:
+                return title[:160]
+        elif line:
+            break          # body text before any heading: there is no title
+    return None
 
 
 def to_markdown(raw, suffix, max_chars=MAX_INPUT_CHARS):
@@ -116,7 +180,7 @@ def to_markdown(raw, suffix, max_chars=MAX_INPUT_CHARS):
     actually needs — heading levels, real tables, lists — where the previous
     per-format parsing flattened all of it into anonymous paragraphs.
 
-    Returns (markdown, title) with title None when the file carries none.
+    Returns (markdown, title); title is None when the document has no heading.
     Raises on failure so callers can fall back to their own error message.
     """
     import io
@@ -126,70 +190,39 @@ def to_markdown(raw, suffix, max_chars=MAX_INPUT_CHARS):
     text = (res.text_content or "").strip()
     if len(text) < 50:
         raise RuntimeError(f"too little text extracted from {suffix}")
-    return text[:max_chars], (getattr(res, "title", None) or "").strip() or None
+    title = (getattr(res, "title", None) or "").strip()
+    if not title and suffix == ".pdf":
+        title = _pdf_title(raw)      # pdfminer drops this on the floor
+    return text[:max_chars], title or _md_title(text)
 
 
-def extract_pdf(url, max_chars=MAX_INPUT_CHARS):
-    """Fetch a PDF URL and hand back its Markdown."""
-    raw, _ = _fetch_bytes(url)
-    if not raw:
-        return {"source": "Article", "title": "PDF link", "url": url,
-                "text": None, "failed": True}
+def extract_document(raw, suffix, url=None, max_chars=MAX_INPUT_CHARS):
+    """Build the extractor dict for an already-fetched document."""
     try:
-        text, title = to_markdown(raw, ".pdf", max_chars)
-        return {"source": "Article", "title": title or url, "url": url,
-                "text": text, "is_pdf": True}
+        text, title = to_markdown(raw, suffix, max_chars)
     except Exception as e:  # noqa: BLE001
-        logger.warning("PDF extraction failed for %s: %s", url, e)
-        return {"source": "Article", "title": "PDF link", "url": url,
+        logger.warning("Document extraction failed for %s (%s): %s",
+                       url or "upload", suffix, e)
+        return {"source": "Article", "title": "Document", "url": url,
                 "text": None, "failed": True}
-
-
-def _is_doc(url, content_type=None):
-    u = (url or "").lower().split("?")[0]
-    if u.endswith(".docx"):
-        return True
-    if u.endswith(".doc"):
-        return True
-    ct = (content_type or "").lower()
-    return "wordprocessingml" in ct or "application/msword" in ct or \
-        "application/vnd.openxmlformats-officedocument.wordprocessingml" in ct
-
-
-def extract_doc(url, max_chars=MAX_INPUT_CHARS):
-    """Fetch a Word document URL and hand back its Markdown.
-
-    .docx is fully supported. Legacy .doc (binary) is not readable — we flag
-    it so the bot can tell the user.
-    """
-    if url and url.lower().split("?")[0].endswith(".doc") and \
-            not url.lower().endswith(".docx"):
-        return {"source": "Article", "title": "Word doc (.doc)",
-                "url": url, "text": None,
-                "failed": True,
-                "note": "Legacy .doc files aren't supported — please "
-                        "re-save as .docx and reshare."}
-    raw, _ = _fetch_bytes(url)
-    if not raw:
-        return {"source": "Article", "title": "Word doc", "url": url,
-                "text": None, "failed": True}
-    try:
-        text, title = to_markdown(raw, ".docx", max_chars)
-        return {"source": "Article", "title": title or url, "url": url,
-                "text": text, "is_doc": True}
-    except Exception as e:  # noqa: BLE001
-        logger.warning("DOC extraction failed for %s: %s", url, e)
-        return {"source": "Article", "title": "Word doc", "url": url,
-                "text": None, "failed": True}
+    return {"source": "Article", "title": title or url or "Document",
+            "url": url, "text": text, "suffix": suffix,
+            "is_pdf": suffix == ".pdf", "is_doc": suffix != ".pdf"}
 
 
 def extract_article(url, max_chars=MAX_INPUT_CHARS):
-    # PDFs and PDF-like responses go through the PDF extractor.
-    raw_head, ctype = _fetch_bytes(url)
-    if raw_head is not None and _is_doc(url, ctype):
-        return extract_doc(url, max_chars=max_chars)
-    if raw_head is not None and _is_pdf(url, ctype):
-        return extract_pdf(url, max_chars=max_chars)
+    # Legacy .doc is a binary format nothing here reads.
+    if url and url.lower().split("?")[0].endswith(".doc"):
+        return {"source": "Article", "title": "Word doc (.doc)", "url": url,
+                "text": None, "failed": True,
+                "note": "Legacy .doc files aren't supported — please "
+                        "re-save as .docx and reshare."}
+    # One fetch: documents are converted from these bytes rather than
+    # downloaded a second time by a per-format extractor.
+    raw, ctype = _fetch_bytes(url)
+    suffix = doc_suffix(url, ctype) if raw is not None else None
+    if suffix and suffix not in (".html", ".htm"):
+        return extract_document(raw, suffix, url, max_chars)
     try:
         import trafilatura
         downloaded = trafilatura.fetch_url(url)

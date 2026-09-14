@@ -13,6 +13,7 @@ All TOOL/LEARNING entries are de-duplicated against existing JSON and saved
 to data/ (resources.json / learnings.json), mirrored into data.json for the
 HTML viewer in site/.
 """
+import asyncio
 import logging
 import os
 import re
@@ -23,7 +24,8 @@ from telegram.ext import (Application, CommandHandler, ContextTypes,
                           MessageHandler, filters)
 
 from .config import TELEGRAM_BOT_TOKEN, ANTHROPIC_MODEL
-from .extractors import extract, classify, to_markdown, URL_RE
+from .extractors import (extract, classify, extract_document,
+                          DOC_SUFFIXES, URL_RE)
 from .github_api import is_github_url, fetch_repo
 from .synthesize import synthesize, synthesize_json
 from .format_telegram import md_to_telegram_html, split_html
@@ -39,8 +41,6 @@ ALLOWED_CHAT_IDS = {811501439}
 # open it from anywhere.
 PAGES_URL = "https://harshjain007.github.io/content-digest-bot/site/index.html"
 
-# Attachment types MarkItDown can turn into Markdown for us.
-SUPPORTED_DOC_TYPES = {".pdf", ".docx", ".pptx", ".xlsx", ".csv", ".html", ".htm"}
 
 NOT_AUTHORIZED = ("🔒 This bot is private. You are not authorized to use it.")
 
@@ -164,8 +164,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if kind == "article":
             data = extract(text)
             if data.get("failed"):
-                await status.edit_text("⚠️ Couldn't read that article. "
-                                       "Paste the text and I'll digest it.")
+                # Some failures carry their own explanation (legacy .doc).
+                await status.edit_text(
+                    f"⚠️ {data['note']}" if data.get("note") else
+                    "⚠️ Couldn't read that article. "
+                    "Paste the text and I'll digest it.")
                 return
             # PDFs / Word docs: full descriptive summary, saved as a resource card.
             if data.get("is_pdf") or data.get("is_doc"):
@@ -253,7 +256,9 @@ async def _handle_pdf(update, status, data):
     web page — so we generate the full deep-dive (not the short summary) and
     persist it as a resource.
     """
-    kind = "Word document" if data.get("is_doc") else "PDF"
+    kind = {".pdf": "PDF", ".docx": "Word document", ".pptx": "PowerPoint deck",
+            ".xlsx": "spreadsheet", ".csv": "spreadsheet",
+            ".html": "page", ".htm": "page"}.get(data.get("suffix"), "document")
     if data.get("note"):  # e.g. legacy .doc not supported
         await status.edit_text(f"⚠️ {data['note']}")
         return
@@ -337,9 +342,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     fname = (doc.file_name or "")
     suffix = os.path.splitext(fname)[1].lower()
-    if suffix not in SUPPORTED_DOC_TYPES:
+    if suffix not in DOC_SUFFIXES:
         await update.message.reply_text(
-            "⚠️ I can read " + ", ".join(sorted(SUPPORTED_DOC_TYPES)) +
+            "⚠️ I can read " + ", ".join(DOC_SUFFIXES) +
             ". Re-send as one of those.")
         return
 
@@ -347,15 +352,18 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         tf = await doc.get_file()
         raw = bytes(await tf.download_as_bytearray())
-        text, title = to_markdown(raw, suffix)
+        # Conversion is synchronous and pdfminer is slow on big PDFs; run it
+        # off the event loop so polling and other chats keep being served.
+        data = await asyncio.to_thread(extract_document, raw, suffix)
     except Exception as e:  # noqa: BLE001
         logger.exception("document handling failed")
         await status.edit_text(f"❌ Couldn't read that file: {e}")
         return
 
-    data = {"source": "Article", "url": None, "text": text,
-            "title": title or fname or "Uploaded file",
-            "is_doc": suffix != ".pdf", "is_pdf": suffix == ".pdf"}
+    if data.get("failed"):
+        await status.edit_text("⚠️ Couldn't read that file. Paste the text.")
+        return
+    data["title"] = data.get("title") or fname or "Uploaded file"
     await _handle_pdf(update, status, data)
 
 
