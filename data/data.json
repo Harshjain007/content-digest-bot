@@ -253,6 +253,18 @@
     "_added": "2026-09-14T04:39:21.308718+00:00"
   },
   {
+    "title": "MarkItDown",
+    "description": "MarkItDown is a lightweight Python utility for converting various file formats (PDF, PowerPoint, Word, Excel, images, audio, HTML, etc.) into Markdown for use with LLMs and text analysis pipelines. It preserves document structure and content, making it suitable for text analysis tools.",
+    "problem": "Converting documents into a structured format like Markdown is essential for leveraging LLMs and text analysis tools. Traditional tools often fail to preserve document structure and content effectively, making MarkItDown a better solution for this purpose.",
+    "how this works": "1. Install MarkItDown using pip: `pip install 'markitdown[all]'`.\n2. Use the command-line interface to convert files: `markitdown path-to-file.pdf > document.md`.\n3. For advanced features, use the Python API with optional dependencies for specific file formats.\n4. Enable plugins for additional functionality like OCR or Azure Content Understanding.\n5. Set up Azure endpoints for enhanced document analysis and structured field extraction.",
+    "links": {
+      "github": "https://github.com/microsoft/markitdown",
+      "website": "",
+      "article": ""
+    },
+    "_added": "2026-09-14T15:33:44.542433+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
