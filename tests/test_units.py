@@ -252,6 +252,92 @@ def test_doc_suffix_routing():
     assert ".pptx" in DOC_SUFFIXES and ".xlsx" in DOC_SUFFIXES
 
 
+def test_error_messages_do_not_leak():
+    """Only messages we wrote ourselves reach the user.
+
+    Raw exception text routinely carries local paths and request URLs, and it
+    used to be interpolated straight into the Telegram reply.
+    """
+    from content_digest_bot.errors import BotError, user_message
+
+    assert user_message(BotError("Ollama isn't reachable.")) == "Ollama isn't reachable."
+
+    leaky = FileNotFoundError("[Errno 2] No such file: '/Users/harshjain/.env'")
+    out = user_message(leaky)
+    assert "/Users/harshjain" not in out and ".env" not in out
+    assert out == "Something went wrong on my side. It's in the log."
+
+    # an empty curated message must not produce a bare "❌ "
+    assert user_message(BotError("  ")) != ""
+
+
+def test_synthesize_falls_back_when_ollama_is_down():
+    """A sleeping local daemon must not cost the user their submission."""
+    from content_digest_bot import synthesize as sy
+    from content_digest_bot.errors import BotError
+
+    real_ollama, real_anthropic = sy._synthesize_ollama, sy._synthesize_anthropic
+    real_provider, real_key = sy.LLM_PROVIDER, sy.ANTHROPIC_API_KEY
+    try:
+        sy.LLM_PROVIDER = "ollama"
+        sy.ANTHROPIC_API_KEY = "sk-test"
+        sy._synthesize_ollama = lambda *a, **k: (_ for _ in ()).throw(
+            BotError("Ollama isn't reachable."))
+        sy._synthesize_anthropic = lambda *a, **k: "card from anthropic"
+
+        assert sy._call("prompt") == "card from anthropic"
+        assert sy.used_fallback.get() is True   # so the bot can say so
+
+        # with no key there is nothing to fall back to: surface the real cause
+        sy.ANTHROPIC_API_KEY = ""
+        try:
+            sy._call("prompt")
+            raise AssertionError("expected the Ollama error to propagate")
+        except BotError as e:
+            assert "reachable" in str(e)
+
+        # the happy path leaves the flag clear, so no spurious note appears
+        sy.ANTHROPIC_API_KEY = "sk-test"
+        sy._synthesize_ollama = lambda *a, **k: "card from ollama"
+        assert sy._call("prompt") == "card from ollama"
+        assert sy.used_fallback.get() is False
+    finally:
+        sy._synthesize_ollama, sy._synthesize_anthropic = real_ollama, real_anthropic
+        sy.LLM_PROVIDER, sy.ANTHROPIC_API_KEY = real_provider, real_key
+
+
+def test_format_card_is_safe_and_readable():
+    """Cards replaced a raw JSON dump; entries are model-written, so escape."""
+    from content_digest_bot.format_telegram import format_card
+
+    entry = {
+        "title": "Tool <script>alert(1)</script> & co",
+        "description": "Does <b>things</b>",
+        "problem": "Solves 5 > 3 problems",
+        "how this works": "1. Install it 2. Configure it 3. Run it",
+        "links": {"github": "https://github.com/a/b",
+                  "website": "javascript:alert(1)",
+                  "article": ""},
+    }
+    out = format_card(entry, "tool", saved=True, register_url="https://x.test/r")
+
+    # model text is escaped, so it cannot break Telegram's HTML parser
+    assert "<script>" not in out and "&lt;script&gt;" in out
+    assert "&amp; co" in out and "5 &gt; 3" in out
+    # only http(s) links survive
+    assert '<a href="https://github.com/a/b">GitHub</a>' in out
+    assert "javascript:" not in out
+    # a single-line numbered run becomes separate steps
+    assert out.count("2. Configure it") == 1
+    assert "\n　1. Install it" in out
+    # the register link rides along instead of a separate message
+    assert '<a href="https://x.test/r">Register</a>' in out
+
+    # a duplicate says why, without pretending it saved
+    dup = format_card(entry, "tool", saved=False, reason="already filed under this link")
+    assert "Already filed" in dup and "already filed under this link" in dup
+
+
 def main():
     with tempfile.TemporaryDirectory() as tmp:
         for name, fn in sorted(globals().items()):

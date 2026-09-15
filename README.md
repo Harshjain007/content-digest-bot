@@ -96,7 +96,7 @@ cp .env.example .env
 | `TELEGRAM_BOT_TOKEN` | from BotFather |
 | `LLM_PROVIDER` | `anthropic` (default) or `ollama` for free local inference |
 | `ANTHROPIC_API_KEY` | needed when `LLM_PROVIDER=anthropic` |
-| `ANTHROPIC_MODEL` | defaults to `claude-3-5-sonnet-latest` |
+| `ANTHROPIC_MODEL` | defaults to `claude-sonnet-5`. Check `client.models.list()` if a model 404s — old ids like `claude-3-5-sonnet-latest` are no longer available. |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | used when `LLM_PROVIDER=ollama` |
 | `INSTAGRAM_USERNAME` / `PASSWORD` | optional; without them the bot asks you to paste a reel's caption |
 | `MAX_INPUT_CHARS` | hard cap on the Markdown sent to the model, in characters (default 30000). This is the token dial — roughly 4 chars per token. |
@@ -241,5 +241,14 @@ python -m tests.test_extractors      # hits the network (YouTube + Wikipedia)
 - The topic gate always calls Ollama, even when `LLM_PROVIDER=anthropic`. If
   Ollama isn't running the gate fails open and lets everything through — by
   design, so a stopped Ollama can't block the bot.
+- With `LLM_PROVIDER=ollama`, a call that can't reach the local server falls
+  back to Anthropic when `ANTHROPIC_API_KEY` is set, so a sleeping daemon
+  doesn't cost you the submission. The reply says when that happened, because
+  the fallback is the paid one. With no key set, the Ollama error surfaces
+  as-is instead.
+- Errors shown in chat are only ever messages the bot wrote itself
+  (`errors.BotError`); anything else is replaced with a generic line and the
+  real exception goes to the log, so paths and request URLs stay out of
+  Telegram.
 - Entries are written by a model, so the site treats every field and URL as
   untrusted: text is escaped and only `http(s)` links are rendered.

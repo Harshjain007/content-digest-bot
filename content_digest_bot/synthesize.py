@@ -7,8 +7,10 @@ Supports two backends (selected via LLM_PROVIDER in .env):
 Prompt formatting uses LangChain's FewShotPromptTemplate (see prompts.py) so
 the model output stays consistent and well-structured.
 """
+import contextvars
 import logging
 
+from .errors import BotError
 from .config import (ANTHROPIC_API_KEY, ANTHROPIC_MODEL, LLM_PROVIDER,
                      OLLAMA_BASE_URL, OLLAMA_MODEL)
 from .prompts import build_prompt_text
@@ -28,17 +30,21 @@ def _parse_json(text):
     import re
     m = re.search(r"\{.*\}", text, re.DOTALL)
     if not m:
-        raise ValueError("no JSON object found in model output")
-    return json.loads(m.group(0))
+        raise BotError("The model didn't return a usable card. Try resending.")
+    try:
+        return json.loads(m.group(0))
+    except json.JSONDecodeError:
+        raise BotError("The model's reply wasn't valid JSON. Try resending.")
 
 
 # --------------------------------------------------------------- Anthropic
 def _synthesize_anthropic(prompt, num_predict=2048):
     if not ANTHROPIC_API_KEY:
-        raise RuntimeError(
-            "❌ ANTHROPIC_API_KEY is not set in .env (needed for LLM_PROVIDER=anthropic).")
+        raise BotError(
+            "ANTHROPIC_API_KEY isn't set in .env (needed for LLM_PROVIDER=anthropic).")
     import anthropic
-    from anthropic import (AuthenticationError, BadRequestError, RateLimitError)
+    from anthropic import (AuthenticationError, BadRequestError,
+                           NotFoundError, RateLimitError)
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     try:
         resp = client.messages.create(
@@ -48,24 +54,24 @@ def _synthesize_anthropic(prompt, num_predict=2048):
         )
         return resp.content[0].text
     except AuthenticationError:
-        raise RuntimeError(
-            "❌ Anthropic rejected your API key — it may be invalid or revoked. "
-            "Check ANTHROPIC_API_KEY in .env.")
+        raise BotError(
+            "Anthropic rejected the API key — it may be invalid or revoked.")
     except BadRequestError as e:
         msg = str(e)
         if "credit balance" in msg or "purchase credits" in msg:
-            raise RuntimeError(
-                "❌ Your Anthropic credit balance is too low. Add credits at "
-                "https://console.anthropic.com/settings/billing  then retry.")
+            raise BotError(
+                "Anthropic credit balance is too low to run this.")
         if "model" in msg and ("not exist" in msg or "access" in msg):
-            raise RuntimeError(
-                f"❌ Model '{ANTHROPIC_MODEL}' isn't available on your plan. "
-                "Check ANTHROPIC_MODEL in .env.")
-        raise RuntimeError(f"❌ Anthropic request error: {msg}")
+            raise BotError(
+                f"Model '{ANTHROPIC_MODEL}' isn't available on this plan.")
+        raise BotError(f"Anthropic rejected the request: {msg[:160]}")
+    except NotFoundError:
+        # Almost always a stale ANTHROPIC_MODEL in .env rather than an outage.
+        raise BotError(
+            f"The model '{ANTHROPIC_MODEL}' doesn't exist on this account. "
+            "Update ANTHROPIC_MODEL in .env.")
     except RateLimitError:
-        raise RuntimeError(
-            "❌ Anthropic rate-limited you. Wait a moment and retry; if it "
-            "persists, your plan's throughput is low.")
+        raise BotError("Anthropic is rate-limiting — try again shortly.")
 
 
 # ----------------------------------------------------------------- Ollama
@@ -84,27 +90,42 @@ def _synthesize_ollama(prompt, num_predict=2048):
         r.raise_for_status()
         return _strip_think(r.json()["message"]["content"])
     except requests.exceptions.ConnectionError:
-        raise RuntimeError(
-            f"❌ Couldn't reach Ollama at {OLLAMA_BASE_URL}. Is Ollama running? "
-            "Start it with `ollama serve` (or just open the Ollama app) and make "
-            f"sure you've pulled the model: `ollama pull {OLLAMA_MODEL}`.")
+        raise BotError(f"Ollama isn't reachable at {OLLAMA_BASE_URL}.")
     except requests.exceptions.Timeout:
-        raise RuntimeError(
-            f"❌ Ollama timed out generating with '{OLLAMA_MODEL}'. The model may "
-            "be too slow/large for your hardware. Try a smaller model "
-            "(e.g. OLLAMA_MODEL=llama3.1:8b).")
+        raise BotError(f"Ollama timed out generating with '{OLLAMA_MODEL}'.")
     except KeyError:
-        raise RuntimeError(
-            "❌ Ollama returned an unexpected response — is the model name "
-            f"'{OLLAMA_MODEL}' valid? Check `ollama list`.")
+        raise BotError(
+            f"Ollama returned an unexpected response — is '{OLLAMA_MODEL}' pulled?")
     except Exception as e:  # noqa: BLE001
-        raise RuntimeError(f"❌ Ollama error: {e}")
+        raise BotError(f"Ollama error: {e}")
+
+
+# Set when a call had to fall back to the paid provider, so the bot can say
+# so in its reply. A ContextVar rather than a module global: handlers
+# interleave at every await, and a global would misattribute the note to
+# whichever chat happened to read it first.
+used_fallback = contextvars.ContextVar("used_fallback", default=False)
 
 
 def _call(prompt, num_predict=2048):
+    """Run the prompt on the configured provider.
+
+    When the provider is Ollama and the local server is asleep, an unreachable
+    daemon used to cost the user their submission outright. If an Anthropic key
+    is configured we retry there instead and flag it, because silently
+    spending money is its own surprise — the bot says which one it used.
+    """
+    used_fallback.set(False)
     if LLM_PROVIDER == "ollama":
         logger.info("Synthesizing via Ollama (%s)", OLLAMA_MODEL)
-        return _synthesize_ollama(prompt, num_predict)
+        try:
+            return _synthesize_ollama(prompt, num_predict)
+        except BotError as e:
+            if not ANTHROPIC_API_KEY:
+                raise
+            logger.warning("Ollama unavailable (%s) — falling back to Anthropic", e)
+            used_fallback.set(True)
+            return _synthesize_anthropic(prompt, num_predict)
     logger.info("Synthesizing via Anthropic (%s)", ANTHROPIC_MODEL)
     return _synthesize_anthropic(prompt, num_predict)
 

@@ -110,3 +110,96 @@ def split_html(html, limit=3800):
     if cur:
         chunks.append(cur)
     return chunks
+
+
+# --------------------------------------------------------------- entry cards
+def _safe_link(url):
+    """Only real http(s) URLs become links; model output is not trusted."""
+    u = str(url or "").strip()
+    return u if u.startswith(("http://", "https://")) else ""
+
+
+def _clip(text, limit):
+    """Trim to a whole word, marking that it was cut."""
+    t = " ".join(str(text or "").split())
+    if len(t) <= limit:
+        return t
+    return t[:limit].rsplit(" ", 1)[0].rstrip(",.;:") + " …"
+
+
+def _block(label, body, limit=600):
+    """A labelled section, or nothing when there is no body worth showing."""
+    body = _clip(body, limit)
+    if len(body) < 2:
+        return ""
+    return f"\n\n<b>{_escape(label)}</b>\n{_escape(body)}"
+
+
+def _steps(body, limit=700):
+    """Render a numbered run as real lines instead of one paragraph.
+
+    The model writes "1. Install … 2. Configure …" on a single line, which in
+    chat becomes an unreadable wall.
+    """
+    text = " ".join(str(body or "").split())
+    if len(text) < 2:
+        return ""
+    text = _clip(text, limit)
+    parts = re.split(r"\s*(?=\b\d{1,2}[.)]\s)", text)
+    parts = [p.strip() for p in parts if p.strip()]
+    if len(parts) > 1:
+        return "\n\n<b>How it works</b>\n" + "\n".join(
+            f"　{_escape(p)}" for p in parts)
+    return _block("How it works", text, limit)
+
+
+def _links_line(links, register_url=None):
+    """One row of links rather than a bare URL per line."""
+    out = []
+    for label, key in (("GitHub", "github"), ("Website", "website"),
+                       ("Source", "article")):
+        u = _safe_link((links or {}).get(key))
+        if u:
+            out.append(f'<a href="{u}">{label}</a>')
+    if register_url:
+        out.append(f'<a href="{register_url}">Register</a>')
+    return "\n\n🔗 " + " · ".join(out) if out else ""
+
+
+def format_card(entry, kind, saved=True, reason="", register_url=None,
+                note=""):
+    """One tidy Telegram message for a filed entry.
+
+    Replaces the old output of three separate messages, one of which was a raw
+    JSON dump of the entry.
+    """
+    heading = {"tool": "Tool", "learn": "Learning", "paper": "Paper",
+               "doc": "Document"}.get(kind, "Note")
+    head = (f"✅ <b>Filed · {heading}</b>" if saved
+            else f"⚠️ <b>Already filed · {heading}</b>")
+    if not saved and reason:
+        head += f"\n<i>{_escape(reason)}</i>"
+
+    title = _clip(entry.get("title"), 120)
+    body = f"\n\n<b>{_escape(title)}</b>" if title else ""
+
+    desc = _clip(entry.get("description"), 500)
+    if desc:
+        body += f"\n{_escape(desc)}"
+
+    if kind == "tool":
+        body += _block("Problem it solves", entry.get("problem"))
+        body += _steps(entry.get("how this works"))
+    elif kind == "learn":
+        takeaways = entry.get("takeAways") or []
+        if isinstance(takeaways, str):
+            takeaways = [t for t in takeaways.split("\n") if t.strip()]
+        items = [_clip(t, 220) for t in takeaways[:8] if str(t).strip()]
+        if items:
+            body += "\n\n<b>Takeaways</b>\n" + "\n".join(
+                f"• {_escape(t)}" for t in items)
+
+    links = entry.get("links")
+    if isinstance(links, str):
+        links = {"article": links}
+    return head + body + _links_line(links, register_url) + (note or "")

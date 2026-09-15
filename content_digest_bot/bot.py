@@ -28,8 +28,10 @@ from .extractors import (extract, classify, extract_document,
                           DOC_SUFFIXES, URL_RE)
 from .github_api import is_github_url, fetch_repo
 from .synthesize import synthesize, synthesize_json
-from .format_telegram import md_to_telegram_html, split_html
+from .format_telegram import md_to_telegram_html, split_html, format_card
 from .moderate import is_allowed, REJECT_MSG
+from .errors import user_message
+from .synthesize import used_fallback
 from .store import add_resource, add_learning
 from .prompts import build_tool_json_prompt, build_learning_json_prompt
 
@@ -95,9 +97,22 @@ async def _send_html(update, text, prefix=""):
             await update.message.reply_text(p + re.sub(r"<[^>]+>", "", chunk))
 
 
-def _pretty_json(obj):
-    import json
-    return "```json\n" + json.dumps(obj, indent=2, ensure_ascii=False) + "\n```"
+async def _send_card(update, entry, kind, added, reason):
+    """Send one formatted card for a filed entry.
+
+    This used to be three messages — a one-line ack, a raw JSON dump of the
+    entry, and a bare register URL.
+    """
+    html = format_card(entry, kind, saved=added, reason=reason,
+                       register_url=PAGES_URL, note=_provider_note())
+    for chunk in split_html(html):
+        try:
+            await update.message.reply_text(
+                chunk, parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("card send failed: %s", e)
+            await update.message.reply_text(re.sub(r"<[^>]+>", "", chunk))
 
 
 # ----------------------------------------------------------------- handlers
@@ -140,7 +155,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.pop("pending", None)
         except Exception as e:  # noqa: BLE001
             logger.exception("expand error")
-            await update.message.reply_text(f"❌ Something went wrong: {e}")
+            await update.message.reply_text(f"❌ {user_message(e)}")
         return
 
     # Topic gate only applies to bare topics (no link). Any shared URL —
@@ -209,11 +224,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         prefix="Want me to explain more? Reply 'yes'.")
     except Exception as e:  # noqa: BLE001
         logger.exception("handle error")
-        await status.edit_text(f"❌ Something went wrong: {e}")
+        await status.edit_text(f"❌ {user_message(e)}")
 
 
-def _pages_link():
-    return f"🔗 Register: {PAGES_URL}"
+def _provider_note():
+    """Say so when a request had to use the paid provider, not the local one."""
+    return ("\n\n⚡ Ollama was unreachable, so this one ran on Anthropic."
+            if used_fallback.get() else "")
 
 
 async def _handle_tool(update, status, github_url, article_url, article_text):
@@ -228,7 +245,7 @@ async def _handle_tool(update, status, github_url, article_url, article_text):
         entry = synthesize_json(prompt, num_predict=1200)
     except Exception as e:  # noqa: BLE001
         logger.exception("tool json failed")
-        await status.edit_text(f"❌ Couldn't build the tool card: {e}")
+        await status.edit_text(f"❌ Couldn't build the tool card. {user_message(e)}")
         return
     # fill links that the model may have missed
     entry.setdefault("links", {})
@@ -238,15 +255,7 @@ async def _handle_tool(update, status, github_url, article_url, article_text):
 
     added, reason = add_resource(entry)
     await status.delete()
-    if added:
-        await update.message.reply_text(
-            f"✅ Saved tool card: <b>{entry.get('title','')}</b>",
-            parse_mode=ParseMode.HTML)
-    else:
-        await update.message.reply_text(
-            f"⚠️ Skipped — {reason} (already in your knowledge base).")
-    await update.message.reply_text(_pretty_json(entry))
-    await update.message.reply_text(_pages_link(), parse_mode=ParseMode.HTML)
+    await _send_card(update, entry, "tool", added, reason)
 
 
 async def _handle_pdf(update, status, data):
@@ -267,7 +276,7 @@ async def _handle_pdf(update, status, data):
         summary = synthesize(data, mode="full", num_predict=4096)
     except Exception as e:  # noqa: BLE001
         logger.exception("doc summary failed")
-        await status.edit_text(f"❌ Couldn't summarize the {kind}: {e}")
+        await status.edit_text(f"❌ Couldn't summarize the {kind}. {user_message(e)}")
         return
     if not summary:
         await status.edit_text(f"⚠️ Couldn't read that {kind}. Paste the text.")
@@ -282,15 +291,8 @@ async def _handle_pdf(update, status, data):
     }
     added, reason = add_resource(entry)
     await status.delete()
-    if added:
-        await update.message.reply_text(
-            f"✅ Saved full summary: <b>{entry['title']}</b>",
-            parse_mode=ParseMode.HTML)
-    else:
-        await update.message.reply_text(
-            f"⚠️ Skipped — {reason} (already in your knowledge base).")
+    await _send_card(update, entry, entry.get("type") or "doc", added, reason)
     await _send_html(update, summary)
-    await update.message.reply_text(_pages_link(), parse_mode=ParseMode.HTML)
 
 
 async def _handle_learning(update, status, article_text, article_url):
@@ -299,19 +301,12 @@ async def _handle_learning(update, status, article_text, article_url):
         entry = synthesize_json(prompt, num_predict=800)
     except Exception as e:  # noqa: BLE001
         logger.exception("learning json failed")
-        await status.edit_text(f"❌ Couldn't build the learning card: {e}")
+        await status.edit_text(f"❌ Couldn't build the learning card. {user_message(e)}")
         return
     entry["links"] = entry.get("links") or article_url
     added, reason = add_learning(entry)
     await status.delete()
-    if added:
-        await update.message.reply_text("✅ Saved learning card.",
-                                        parse_mode=ParseMode.HTML)
-    else:
-        await update.message.reply_text(
-            f"⚠️ Skipped — {reason} (already in your knowledge base).")
-    await update.message.reply_text(_pretty_json(entry))
-    await update.message.reply_text(_pages_link(), parse_mode=ParseMode.HTML)
+    await _send_card(update, entry, "learn", added, reason)
 
 
 # ----------------------------------------------------------------- helpers
@@ -357,7 +352,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = await asyncio.to_thread(extract_document, raw, suffix)
     except Exception as e:  # noqa: BLE001
         logger.exception("document handling failed")
-        await status.edit_text(f"❌ Couldn't read that file: {e}")
+        await status.edit_text(f"❌ {user_message(e, 'Couldn\'t read that file.')}")
         return
 
     if data.get("failed"):
