@@ -464,7 +464,8 @@ def test_retry_button_replays_the_original_input():
     class FakeMsg:
         def __init__(self):
             self.sent, self.markup = [], None
-            self.chat = types.SimpleNamespace(id=next(iter(bot.ALLOWED_CHAT_IDS)))
+            chat_id = next(iter(bot.ALLOWED_CHAT_IDS), 1)
+            self.chat = types.SimpleNamespace(id=chat_id)
 
         async def reply_text(self, text, reply_markup=None, **kw):
             self.sent.append(text)
@@ -510,6 +511,24 @@ def test_retry_button_replays_the_original_input():
         assert "expired" in query.message.sent[-1]
 
     asyncio.run(scenario())
+
+
+def test_pages_publish_is_limited_to_the_site():
+    """Only site/ and data/ may reach gh-pages.
+
+    Pushing the whole branch made GitHub Pages serve every module as a static
+    file — /content_digest_bot/bot.py returned 200 — so "make the repo
+    private" would not have made the code private.
+    """
+    import inspect
+    from content_digest_bot import store
+
+    src = inspect.getsource(store._publish_to_pages) + inspect.getsource(
+        store._publish_tree)
+    assert "HEAD:refs/heads/gh-pages" not in src, \
+        "publishing HEAD exposes the whole repository on the Pages site"
+    assert 'for path in ("site", "data")' in src
+    assert "commit-tree" in src and "read-tree" in src
 
 
 def main():

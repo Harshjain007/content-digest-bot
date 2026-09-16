@@ -24,7 +24,8 @@ from telegram.constants import ParseMode
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           ContextTypes, MessageHandler, filters)
 
-from .config import TELEGRAM_BOT_TOKEN, ANTHROPIC_MODEL
+from .config import (ALLOWED_CHAT_IDS, TELEGRAM_BOT_TOKEN,
+                     ANTHROPIC_MODEL)
 from .extractors import (extract, classify, extract_document,
                           DOC_SUFFIXES, URL_RE)
 from .github_api import is_github_url, fetch_repo
@@ -36,9 +37,8 @@ from .synthesize import used_fallback
 from .store import add_resource, add_learning
 from .prompts import build_tool_json_prompt, build_learning_json_prompt
 
-# Private bot: only these Telegram user/chat IDs may use it.
-# Your chat id was observed earlier; add others as needed.
-ALLOWED_CHAT_IDS = {811501439}
+# Private bot: only these Telegram chat ids may use it. Set ALLOWED_CHAT_IDS
+# in .env — an empty set refuses everyone, which is the safe way to fail.
 
 # Live knowledge register (GitHub Pages) — shown after every save so you can
 # open it from anywhere.
@@ -481,6 +481,10 @@ async def _process_document(update, context, file_id, fname):
 def main():
     if not TELEGRAM_BOT_TOKEN:
         print("ERROR: set TELEGRAM_BOT_TOKEN in your .env first.")
+        return
+    if not ALLOWED_CHAT_IDS:
+        print("ERROR: set ALLOWED_CHAT_IDS in your .env (your Telegram chat id),"
+              " otherwise the bot refuses everyone.")
         return
     # Ensure the site data files reflect current storage on startup.
     try:

@@ -21,3 +21,11 @@ INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")
 INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD")
 
 MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "30000"))
+
+# Telegram chat ids allowed to use the bot, comma-separated. Kept out of the
+# source because it is published: a hardcoded id sat in a public repo, and on
+# the Pages site, identifying the owner's Telegram account.
+ALLOWED_CHAT_IDS = {
+    int(c) for c in os.getenv("ALLOWED_CHAT_IDS", "").replace(" ", "").split(",")
+    if c.strip().lstrip("-").isdigit()
+}

@@ -230,34 +230,89 @@ def _run_git(args, cwd):
 
 
 def _publish_to_pages(commit_msg="update knowledge register"):
-    """Commit site/ + data/ and push them to the gh-pages branch so the
-    GitHub Pages site reflects the latest save. Best-effort: failures are
-    logged but never break the bot's main flow.
+    """Publish site/ and data/ to gh-pages — and nothing else.
+
+    This used to push the whole branch (`HEAD:gh-pages`), which meant GitHub
+    Pages served the entire repository as static files: every module was
+    downloadable from the site, e.g. /content_digest_bot/bot.py. Harmless
+    while the repo is public, but it makes "make the repo private" a false
+    sense of privacy, since Pages would keep serving the code regardless.
+
+    So the published commit is built from scratch out of exactly two trees,
+    using a scratch index so the working tree is never touched.
     """
     if os.getenv("CDB_NO_PUBLISH"):
         return
     if not os.path.isdir(os.path.join(REPO_ROOT, ".git")):
         return
-    ok, out = _run_git(["add", "site", "data"], REPO_ROOT)
+
+    # Stage the two directories we actually want live.
+    ok, _ = _run_git(["add", "site", "data"], REPO_ROOT)
     if not ok:
-        logger.warning("Pages publish: git add failed: %s", out)
         return
-    # Only commit if there is something staged.
     ok, _ = _run_git(["diff", "--cached", "--quiet"], REPO_ROOT)
-    if ok:  # nothing staged -> nothing changed
+    if ok:                       # nothing changed
         return
-    msg = f"add: {commit_msg}" if commit_msg != "update knowledge register" \
-        else "publish: update knowledge register"
+    msg = (f"add: {commit_msg}" if commit_msg != "update knowledge register"
+           else "publish: update knowledge register")
     ok, out = _run_git(["commit", "-m", msg], REPO_ROOT)
     if not ok:
         logger.warning("Pages publish: commit failed: %s", out)
         return
-    ok, out = _run_git(
-        ["push", "origin", "HEAD:refs/heads/gh-pages"], REPO_ROOT)
+
+    published = _publish_tree(msg)
+    if not published:
+        return
+    ok, out = _run_git(["push", "origin", f"{published}:refs/heads/gh-pages"],
+                       REPO_ROOT)
     if not ok:
         logger.warning("Pages publish: push failed: %s", out)
         return
     logger.info("Published site to GitHub Pages (gh-pages).")
+
+
+def _publish_tree(msg):
+    """Build a commit containing only site/ and data/. Returns its sha."""
+    import tempfile
+
+    index = os.path.join(tempfile.gettempdir(), f"cdb-index-{os.getpid()}")
+    env = dict(os.environ, GIT_INDEX_FILE=index)
+
+    def git(args):
+        try:
+            res = subprocess.run(["git", *args], cwd=REPO_ROOT, env=env,
+                                 capture_output=True, text=True, timeout=60)
+            return res.returncode == 0, (res.stdout + res.stderr).strip()
+        except Exception as e:  # noqa: BLE001
+            return False, str(e)
+
+    try:
+        git(["read-tree", "--empty"])
+        for path in ("site", "data"):
+            ok, out = git(["read-tree", f"--prefix={path}/", f"HEAD:{path}"])
+            if not ok:
+                logger.warning("Pages publish: read-tree %s failed: %s", path, out)
+                return None
+        ok, tree = git(["write-tree"])
+        if not ok:
+            logger.warning("Pages publish: write-tree failed: %s", tree)
+            return None
+
+        # Keep gh-pages history linear when it already exists.
+        parent_ok, parent = _run_git(
+            ["rev-parse", "--verify", "-q", "refs/remotes/origin/gh-pages"],
+            REPO_ROOT)
+        args = ["commit-tree", tree, "-m", msg]
+        if parent_ok and parent:
+            args += ["-p", parent.strip()]
+        ok, sha = git(args)
+        if not ok:
+            logger.warning("Pages publish: commit-tree failed: %s", sha)
+            return None
+        return sha.strip()
+    finally:
+        if os.path.exists(index):
+            os.unlink(index)
 
 
 def dedupe(dry_run=False):
