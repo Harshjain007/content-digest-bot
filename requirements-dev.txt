@@ -1,6 +1,0 @@
-# Test-only dependencies. The bot itself does not need these.
--r requirements.txt
-# builds the .docx fixture in tests/test_units.py; markitdown reads .docx via
-# mammoth, so python-docx is not a runtime dependency.
-python-docx>=1.1
-pyflakes>=3.0
