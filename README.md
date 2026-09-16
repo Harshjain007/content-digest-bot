@@ -246,6 +246,13 @@ python -m tests.test_extractors      # hits the network (YouTube + Wikipedia)
   doesn't cost you the submission. The reply says when that happened, because
   the fallback is the paid one. With no key set, the Ollama error surfaces
   as-is instead.
+- Failures retry. A transient cause — a timeout, a rate limit, an unreachable
+  host — is retried automatically (backing off 1s then 2s) before you see
+  anything. A permanent one is not: a revoked key, an exhausted balance or a
+  model that doesn't exist fails identically the second time, so it surfaces
+  straight away. Whatever survives that comes with a **🔄 Retry** button that
+  replays the original link or file, so a failed digest never means re-sending
+  it. Uploads replay by `file_id`, so nothing is uploaded twice.
 - Errors shown in chat are only ever messages the bot wrote itself
   (`errors.BotError`); anything else is replaced with a generic line and the
   real exception goes to the log, so paths and request URLs stay out of

@@ -407,6 +407,111 @@ def test_model_calls_do_not_block_the_event_loop():
     assert asyncio.run(without_fallback()) == ""
 
 
+def test_retry_only_repeats_what_a_retry_can_fix():
+    """Transient failures retry themselves; permanent ones don't.
+
+    Retrying a revoked key or a missing model fails identically the second
+    time and just costs the user the wait.
+    """
+    from content_digest_bot import synthesize as sy
+    from content_digest_bot.errors import BotError, TransientError
+
+    attempts = []
+
+    def flaky():
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise TransientError("rate limited")
+        return "ok"
+
+    assert sy._retrying(flaky) == "ok"
+    assert len(attempts) == 3
+
+    permanent = []
+
+    def broken():
+        permanent.append(1)
+        raise BotError("model doesn't exist")
+
+    try:
+        sy._retrying(broken)
+        raise AssertionError("permanent errors must not be retried")
+    except BotError:
+        pass
+    assert len(permanent) == 1, "a permanent failure was retried"
+
+    # a transient failure that never clears still surfaces
+    hopeless = []
+
+    def always():
+        hopeless.append(1)
+        raise TransientError("timed out")
+
+    try:
+        sy._retrying(always, attempts=2)
+        raise AssertionError("expected the error to surface")
+    except TransientError:
+        pass
+    assert len(hopeless) == 2
+
+
+def test_retry_button_replays_the_original_input():
+    """A failure offers a button that replays the request."""
+    import asyncio
+    import types
+    from content_digest_bot import bot
+
+    class FakeMsg:
+        def __init__(self):
+            self.sent, self.markup = [], None
+            self.chat = types.SimpleNamespace(id=next(iter(bot.ALLOWED_CHAT_IDS)))
+
+        async def reply_text(self, text, reply_markup=None, **kw):
+            self.sent.append(text)
+            self.markup = reply_markup
+            return self
+
+        async def edit_text(self, text, reply_markup=None, **kw):
+            self.sent.append(text)
+            self.markup = reply_markup
+            return self
+
+    ctx = types.SimpleNamespace(user_data={})
+
+    async def scenario():
+        status = FakeMsg()
+        # nothing remembered yet -> nothing to replay, so no button
+        await bot._fail(ctx, "❌ boom", status=status)
+        assert status.markup is None
+
+        bot._remember(ctx, {"kind": "text", "text": "https://github.com/a/b"})
+        await bot._fail(ctx, "❌ Ollama isn't reachable.", status=status)
+        button = status.markup.inline_keyboard[0][0]
+        assert button.text == "🔄 Retry"
+        assert ctx.user_data[button.callback_data]["text"] == "https://github.com/a/b"
+
+        # a second failure must not reuse the first token
+        await bot._fail(ctx, "❌ again", status=status)
+        assert status.markup.inline_keyboard[0][0].callback_data != button.callback_data
+
+        # an unknown token says so rather than raising
+        class Query:
+            data = bot.RETRY_PREFIX + "expired"
+            message = FakeMsg()
+
+            async def answer(self):
+                pass
+
+            async def edit_message_text(self, text, **kw):
+                self.message.sent.append(text)
+
+        query = Query()
+        await bot.retry_cb(types.SimpleNamespace(callback_query=query), ctx)
+        assert "expired" in query.message.sent[-1]
+
+    asyncio.run(scenario())
+
+
 def main():
     with tempfile.TemporaryDirectory() as tmp:
         for name, fn in sorted(globals().items()):

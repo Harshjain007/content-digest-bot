@@ -9,8 +9,9 @@ the model output stays consistent and well-structured.
 """
 import contextvars
 import logging
+import time
 
-from .errors import BotError
+from .errors import BotError, TransientError
 from .config import (ANTHROPIC_API_KEY, ANTHROPIC_MODEL, LLM_PROVIDER,
                      OLLAMA_BASE_URL, OLLAMA_MODEL)
 from .prompts import build_prompt_text
@@ -43,7 +44,8 @@ def _synthesize_anthropic(prompt, num_predict=2048):
         raise BotError(
             "ANTHROPIC_API_KEY isn't set in .env (needed for LLM_PROVIDER=anthropic).")
     import anthropic
-    from anthropic import (AuthenticationError, BadRequestError,
+    from anthropic import (APIConnectionError, APIStatusError,
+                           AuthenticationError, BadRequestError,
                            NotFoundError, RateLimitError)
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     try:
@@ -65,13 +67,19 @@ def _synthesize_anthropic(prompt, num_predict=2048):
             raise BotError(
                 f"Model '{ANTHROPIC_MODEL}' isn't available on this plan.")
         raise BotError(f"Anthropic rejected the request: {msg[:160]}")
+    except APIConnectionError:
+        raise TransientError("Couldn't reach Anthropic — network looks down.")
+    except APIStatusError as e:
+        if e.status_code in (500, 502, 503, 529):
+            raise TransientError("Anthropic is overloaded — try again shortly.")
+        raise BotError(f"Anthropic returned {e.status_code}.")
     except NotFoundError:
         # Almost always a stale ANTHROPIC_MODEL in .env rather than an outage.
         raise BotError(
             f"The model '{ANTHROPIC_MODEL}' doesn't exist on this account. "
             "Update ANTHROPIC_MODEL in .env.")
     except RateLimitError:
-        raise BotError("Anthropic is rate-limiting — try again shortly.")
+        raise TransientError("Anthropic is rate-limiting — try again shortly.")
 
 
 # ----------------------------------------------------------------- Ollama
@@ -90,9 +98,9 @@ def _synthesize_ollama(prompt, num_predict=2048):
         r.raise_for_status()
         return _strip_think(r.json()["message"]["content"])
     except requests.exceptions.ConnectionError:
-        raise BotError(f"Ollama isn't reachable at {OLLAMA_BASE_URL}.")
+        raise TransientError(f"Ollama isn't reachable at {OLLAMA_BASE_URL}.")
     except requests.exceptions.Timeout:
-        raise BotError(f"Ollama timed out generating with '{OLLAMA_MODEL}'.")
+        raise TransientError(f"Ollama timed out generating with '{OLLAMA_MODEL}'.")
     except KeyError:
         raise BotError(
             f"Ollama returned an unexpected response — is '{OLLAMA_MODEL}' pulled?")
@@ -107,6 +115,24 @@ def _synthesize_ollama(prompt, num_predict=2048):
 used_fallback = contextvars.ContextVar("used_fallback", default=False)
 
 
+def _retrying(fn, *args, attempts=3, **kwargs):
+    """Run fn, retrying only the failures that a retry can actually fix.
+
+    Backs off 1s then 2s. A permanent BotError propagates on the first try —
+    a bad key or a missing model fails identically however often it is asked.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn(*args, **kwargs)
+        except TransientError as e:
+            if attempt == attempts:
+                raise
+            delay = 2 ** (attempt - 1)
+            logger.warning("%s — retrying in %ss (attempt %d/%d)",
+                           e, delay, attempt + 1, attempts)
+            time.sleep(delay)
+
+
 def _call(prompt, num_predict=2048):
     """Run the prompt on the configured provider.
 
@@ -119,15 +145,15 @@ def _call(prompt, num_predict=2048):
     if LLM_PROVIDER == "ollama":
         logger.info("Synthesizing via Ollama (%s)", OLLAMA_MODEL)
         try:
-            return _synthesize_ollama(prompt, num_predict)
+            return _retrying(_synthesize_ollama, prompt, num_predict, attempts=2)
         except BotError as e:
             if not ANTHROPIC_API_KEY:
                 raise
             logger.warning("Ollama unavailable (%s) — falling back to Anthropic", e)
             used_fallback.set(True)
-            return _synthesize_anthropic(prompt, num_predict)
+            return _retrying(_synthesize_anthropic, prompt, num_predict)
     logger.info("Synthesizing via Anthropic (%s)", ANTHROPIC_MODEL)
-    return _synthesize_anthropic(prompt, num_predict)
+    return _retrying(_synthesize_anthropic, prompt, num_predict)
 
 
 def synthesize(data, user_note=None, mode="full", num_predict=2048):

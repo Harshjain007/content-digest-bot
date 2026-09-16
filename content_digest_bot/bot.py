@@ -15,13 +15,14 @@ HTML viewer in site/.
 """
 import asyncio
 import logging
+import secrets
 import os
 import re
 
-from telegram import Update
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, Update)
 from telegram.constants import ParseMode
-from telegram.ext import (Application, CommandHandler, ContextTypes,
-                          MessageHandler, filters)
+from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
+                          ContextTypes, MessageHandler, filters)
 
 from .config import TELEGRAM_BOT_TOKEN, ANTHROPIC_MODEL
 from .extractors import (extract, classify, extract_document,
@@ -97,6 +98,74 @@ async def _send_html(update, text, prefix=""):
             await update.message.reply_text(p + re.sub(r"<[^>]+>", "", chunk))
 
 
+RETRY_PREFIX = "retry:"
+
+
+class _ReplayUpdate:
+    """Just enough of an Update for the existing handlers to reply into a chat.
+
+    A callback query has no `.message` of its own in the sense the handlers
+    expect, and rewriting every helper to take a chat id instead of an update
+    would be a far bigger change than wrapping it once here.
+    """
+
+    def __init__(self, message):
+        self.message = message
+        self.effective_chat = message.chat
+
+
+def _remember(context, payload):
+    """Record what this request was, so a failure can offer to replay it."""
+    context.user_data["retry_payload"] = payload
+
+
+def _retry_markup(context):
+    """A Retry button bound to the last input, or nothing to attach."""
+    payload = context.user_data.get("retry_payload")
+    if not payload:
+        return None
+    token = RETRY_PREFIX + secrets.token_urlsafe(8)
+    context.user_data[token] = payload
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton("🔄 Retry", callback_data=token)]])
+
+
+async def _fail(context, text, status=None, message=None):
+    """Report a failure with a Retry button attached."""
+    markup = _retry_markup(context)
+    try:
+        if status is not None:
+            await status.edit_text(text, reply_markup=markup)
+        else:
+            await message.reply_text(text, reply_markup=markup)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("could not send failure notice: %s", e)
+
+
+async def retry_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Replay the request behind a Retry button."""
+    query = update.callback_query
+    await query.answer()
+    if query.message.chat.id not in ALLOWED_CHAT_IDS:
+        return
+    payload = context.user_data.pop(query.data, None)
+    if not payload:
+        await query.edit_message_text(
+            "⌛ That retry has expired — send it again and I'll pick it up.")
+        return
+    await query.edit_message_text("🔄 Retrying…")
+    replay = _ReplayUpdate(query.message)
+    try:
+        if payload["kind"] == "text":
+            await _process_text(replay, context, payload["text"])
+        else:
+            await _process_document(replay, context, payload["file_id"],
+                                    payload["file_name"])
+    except Exception as e:  # noqa: BLE001
+        logger.exception("retry failed")
+        await _fail(context, f"❌ {user_message(e)}", message=query.message)
+
+
 async def _model_call(fn, *args, **kwargs):
     """Run a blocking model call without freezing the bot.
 
@@ -158,6 +227,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(NOT_AUTHORIZED)
         return
 
+    _remember(context, {"kind": "text", "text": text})
+    await _process_text(update, context, text)
+
+
+async def _process_text(update, context, text):
+    """The pipeline for a text message, replayable by the Retry button."""
+    chat_id = update.effective_chat.id
     await context.bot.send_chat_action(chat_id, "typing")
 
     # Explain-more follow-up for a pending CONCEPT.
@@ -174,7 +250,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.pop("pending", None)
         except Exception as e:  # noqa: BLE001
             logger.exception("expand error")
-            await update.message.reply_text(f"❌ {user_message(e)}")
+            await _fail(context, f"❌ {user_message(e)}",
+                        message=update.message)
         return
 
     # Topic gate only applies to bare topics (no link). Any shared URL —
@@ -192,7 +269,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ---- TOOL flow: GitHub URL, or article -> GitHub ----
         if is_github_url(url):
-            await _handle_tool(update, status, github_url=url,
+            await _handle_tool(update, context, status, github_url=url,
                                article_url=None, article_text=None)
             return
         if kind == "article":
@@ -206,17 +283,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             # PDFs / Word docs: full descriptive summary, saved as a resource card.
             if data.get("is_pdf") or data.get("is_doc"):
-                await _handle_pdf(update, status, data)
+                await _handle_pdf(update, context, status, data)
                 return
             gh = _find_github_link(data.get("text") or "")
             if gh:
-                await _handle_tool(update, status, github_url=gh,
+                await _handle_tool(update, context, status, github_url=gh,
                                    article_url=url,
                                    article_text=data.get("text"))
             else:
                 # No GitHub link -> is it a learning article?
                 if _looks_like_learning(data.get("text") or ""):
-                    await _handle_learning(update, status,
+                    await _handle_learning(update, context, status,
                                            article_text=data.get("text"),
                                            article_url=url)
                 else:
@@ -244,7 +321,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                          prefix="Want me to explain more? Reply 'yes'.")
     except Exception as e:  # noqa: BLE001
         logger.exception("handle error")
-        await status.edit_text(f"❌ {user_message(e)}")
+        await _fail(context, f"❌ {user_message(e)}", status=status)
 
 
 def _provider_note():
@@ -253,7 +330,8 @@ def _provider_note():
             if used_fallback.get() else "")
 
 
-async def _handle_tool(update, status, github_url, article_url, article_text):
+async def _handle_tool(update, context, status, github_url, article_url,
+                       article_text):
     repo = fetch_repo(github_url)
     gh_text = repo.get("readme") if repo else ""
     website = repo.get("homepage") if repo else ""
@@ -265,7 +343,9 @@ async def _handle_tool(update, status, github_url, article_url, article_text):
         entry = await _model_call(synthesize_json, prompt, num_predict=1200)
     except Exception as e:  # noqa: BLE001
         logger.exception("tool json failed")
-        await status.edit_text(f"❌ Couldn't build the tool card. {user_message(e)}")
+        await _fail(context,
+                    f"❌ Couldn't build the tool card. {user_message(e)}",
+                    status=status)
         return
     # fill links that the model may have missed
     entry.setdefault("links", {})
@@ -278,7 +358,7 @@ async def _handle_tool(update, status, github_url, article_url, article_text):
     await _send_card(update, entry, "tool", added, reason)
 
 
-async def _handle_pdf(update, status, data):
+async def _handle_pdf(update, context, status, data):
     """PDF / Word doc: full descriptive summary, saved as a resource card.
 
     The user wants a complete, readable explanation they can revisit on the
@@ -297,7 +377,9 @@ async def _handle_pdf(update, status, data):
                                     num_predict=4096)
     except Exception as e:  # noqa: BLE001
         logger.exception("doc summary failed")
-        await status.edit_text(f"❌ Couldn't summarize the {kind}. {user_message(e)}")
+        await _fail(context,
+                    f"❌ Couldn't summarize the {kind}. {user_message(e)}",
+                    status=status)
         return
     if not summary:
         await status.edit_text(f"⚠️ Couldn't read that {kind}. Paste the text.")
@@ -316,13 +398,15 @@ async def _handle_pdf(update, status, data):
     await _send_html(update, summary)
 
 
-async def _handle_learning(update, status, article_text, article_url):
+async def _handle_learning(update, context, status, article_text, article_url):
     prompt = build_learning_json_prompt(article_text, article_url)
     try:
         entry = await _model_call(synthesize_json, prompt, num_predict=800)
     except Exception as e:  # noqa: BLE001
         logger.exception("learning json failed")
-        await status.edit_text(f"❌ Couldn't build the learning card. {user_message(e)}")
+        await _fail(context,
+                    f"❌ Couldn't build the learning card. {user_message(e)}",
+                    status=status)
         return
     entry["links"] = entry.get("links") or article_url
     added, reason = add_learning(entry)
@@ -364,23 +448,34 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ". Re-send as one of those.")
         return
 
+    # file_id stays valid across retries, so a replay needs no re-upload.
+    _remember(context, {"kind": "doc", "file_id": doc.file_id,
+                        "file_name": fname})
+    await _process_document(update, context, doc.file_id, fname)
+
+
+async def _process_document(update, context, file_id, fname):
+    """Convert and file a document, replayable by the Retry button."""
+    suffix = os.path.splitext(fname)[1].lower()
     status = await update.message.reply_text("📎 Reading file…")
     try:
-        tf = await doc.get_file()
+        tf = await context.bot.get_file(file_id)
         raw = bytes(await tf.download_as_bytearray())
         # Conversion is synchronous and pdfminer is slow on big PDFs; run it
         # off the event loop so polling and other chats keep being served.
         data = await asyncio.to_thread(extract_document, raw, suffix)
     except Exception as e:  # noqa: BLE001
         logger.exception("document handling failed")
-        await status.edit_text(f"❌ {user_message(e, 'Couldn\'t read that file.')}")
+        await _fail(context, f"❌ {user_message(e, 'Couldn\'t read that file.')}",
+                    status=status)
         return
 
     if data.get("failed"):
-        await status.edit_text("⚠️ Couldn't read that file. Paste the text.")
+        await _fail(context, "⚠️ Couldn't read that file. Paste the text, "
+                             "or retry.", status=status)
         return
     data["title"] = data.get("title") or fname or "Uploaded file"
-    await _handle_pdf(update, status, data)
+    await _handle_pdf(update, context, status, data)
 
 
 def main():
@@ -398,6 +493,7 @@ def main():
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    app.add_handler(CallbackQueryHandler(retry_cb, pattern=f"^{RETRY_PREFIX}"))
     print(f"Bot running (model={ANTHROPIC_MODEL})…  Ctrl+C to stop.")
     # launchd restarts the process on crash; a manual retry loop here can spawn
     # overlapping pollers (double getUpdates → 409), so just run once.

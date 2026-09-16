@@ -18,6 +18,16 @@ class BotError(Exception):
     """
 
 
+class TransientError(BotError):
+    """A failure worth retrying on its own: a blip, a timeout, a rate limit.
+
+    Separated from BotError because retrying the rest is pointless — a revoked
+    key, an empty credit balance or a model that doesn't exist will fail
+    exactly the same way the second time, and retrying just burns the user's
+    time.
+    """
+
+
 GENERIC = "Something went wrong on my side. It's in the log."
 
 
