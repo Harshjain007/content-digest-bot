@@ -46,7 +46,13 @@ def _save(path, items):
 
 
 def _keywords(text):
-    text = (text or "").lower()
+    # takeAways arrives as a list, and every entry comparison funnels through
+    # here — flattening once is what keeps .lower() from blowing up on it.
+    if isinstance(text, (list, tuple, set)):
+        text = " ".join(str(t) for t in text)
+    elif not isinstance(text, str):
+        text = "" if text is None else str(text)
+    text = text.lower()
     # strip punctuation, keep words >=4 chars, drop very common ones
     stop = {"this", "that", "with", "from", "your", "what", "when", "have",
             "will", "they", "their", "about", "which", "those", "these", "into",

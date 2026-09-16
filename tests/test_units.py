@@ -338,6 +338,75 @@ def test_format_card_is_safe_and_readable():
     assert "Already filed" in dup and "already filed under this link" in dup
 
 
+def test_keywords_handles_non_string_fields():
+    """takeAways is a list, and every comparison funnels through _keywords.
+
+    This raised `AttributeError: 'list' object has no attribute 'lower'` in
+    production, which meant learning cards never got de-duplicated at all —
+    add_learning crashed instead of returning a verdict.
+    """
+    from content_digest_bot.store import _keywords, _is_duplicate
+
+    assert _keywords(["use Ditto", "try Vibe Coding"]) >= {"ditto", "vibe"}
+    for weird in (None, 42, {"a": 1}, ["x", None, 7], ("t",)):
+        _keywords(weird)              # must not raise
+
+    entry = {"description": "free AI resources",
+             "takeAways": ["use Ditto", "try Vibe Coding"]}
+    assert _is_duplicate(entry, [dict(entry)]) is True
+
+
+def test_model_calls_do_not_block_the_event_loop():
+    """A long generation must not freeze every other chat.
+
+    Model calls are synchronous and ran directly on the loop, so a 4096-token
+    local generation stalled polling, /help, and even editing the status
+    message the user was staring at.
+    """
+    import asyncio
+    import time
+    from content_digest_bot.bot import _model_call, _provider_note
+    from content_digest_bot.synthesize import used_fallback
+
+    def slow():
+        time.sleep(0.6)
+        return "generated"
+
+    async def other_traffic():
+        ticks = 0
+        for _ in range(6):
+            await asyncio.sleep(0.1)
+            ticks += 1
+        return ticks
+
+    async def scenario():
+        t0 = time.time()
+        out, ticks = await asyncio.gather(_model_call(slow), other_traffic())
+        return out, ticks, time.time() - t0
+
+    out, ticks, elapsed = asyncio.run(scenario())
+    assert out == "generated"
+    assert ticks == 6, "the loop was blocked while the model ran"
+    assert elapsed < 1.1, f"calls ran serially ({elapsed:.2f}s), not concurrently"
+
+    # the fallback flag is set inside the worker thread, which gets a *copy* of
+    # the context; it has to be carried back or the provider note goes missing.
+    async def with_fallback():
+        used_fallback.set(False)
+        await _model_call(lambda: used_fallback.set(True) or "card")
+        return used_fallback.get(), _provider_note()
+
+    flag, note = asyncio.run(with_fallback())
+    assert flag is True and "Anthropic" in note
+
+    async def without_fallback():
+        used_fallback.set(False)
+        await _model_call(lambda: "card")
+        return _provider_note()
+
+    assert asyncio.run(without_fallback()) == ""
+
+
 def main():
     with tempfile.TemporaryDirectory() as tmp:
         for name, fn in sorted(globals().items()):

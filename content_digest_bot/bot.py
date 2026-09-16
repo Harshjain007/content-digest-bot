@@ -97,6 +97,24 @@ async def _send_html(update, text, prefix=""):
             await update.message.reply_text(p + re.sub(r"<[^>]+>", "", chunk))
 
 
+async def _model_call(fn, *args, **kwargs):
+    """Run a blocking model call without freezing the bot.
+
+    Generation takes minutes on a local model, and it ran on the event loop:
+    every other chat, /help included, was stuck behind it, and the status
+    message couldn't even be updated.
+
+    to_thread runs the call in a *copy* of the context, so used_fallback set
+    inside the thread never reaches this one — read it there and carry it back.
+    """
+    def run():
+        return fn(*args, **kwargs), used_fallback.get()
+
+    result, fell_back = await asyncio.to_thread(run)
+    used_fallback.set(fell_back)
+    return result
+
+
 async def _send_card(update, entry, kind, added, reason):
     """Send one formatted card for a filed entry.
 
@@ -146,8 +164,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending = context.user_data.get("pending")
     if pending and _is_expand(text):
         try:
-            full = synthesize(pending, user_note=pending.get("user_note"),
-                              mode="full")
+            full = await _model_call(synthesize, pending,
+                                     user_note=pending.get("user_note"),
+                                     mode="full")
             if full is None:
                 await update.message.reply_text("⚠️ Nothing to explain.")
                 return
@@ -203,9 +222,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     # Generic AI article: just summarize in chat.
                     await status.delete()
-                    await _send_html(update,
-                                    synthesize(data, mode="summary"),
-                                    prefix="Want me to explain more? Reply 'yes'.")
+                    summary = await _model_call(synthesize, data, mode="summary")
+                    await _send_html(update, summary,
+                                     prefix="Want me to explain more? Reply 'yes'.")
                     context.user_data["pending"] = data
             return
 
@@ -220,8 +239,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         context.user_data["pending"] = data
         await status.delete()
-        await _send_html(update, synthesize(data, mode="summary"),
-                        prefix="Want me to explain more? Reply 'yes'.")
+        summary = await _model_call(synthesize, data, mode="summary")
+        await _send_html(update, summary,
+                         prefix="Want me to explain more? Reply 'yes'.")
     except Exception as e:  # noqa: BLE001
         logger.exception("handle error")
         await status.edit_text(f"❌ {user_message(e)}")
@@ -242,7 +262,7 @@ async def _handle_tool(update, status, github_url, article_url, article_text):
     prompt = build_tool_json_prompt(article_text, gh_text, article_url,
                                     github_url, website)
     try:
-        entry = synthesize_json(prompt, num_predict=1200)
+        entry = await _model_call(synthesize_json, prompt, num_predict=1200)
     except Exception as e:  # noqa: BLE001
         logger.exception("tool json failed")
         await status.edit_text(f"❌ Couldn't build the tool card. {user_message(e)}")
@@ -273,7 +293,8 @@ async def _handle_pdf(update, status, data):
         return
     await status.edit_text(f"📄 Reading the {kind} and writing a full explanation…")
     try:
-        summary = synthesize(data, mode="full", num_predict=4096)
+        summary = await _model_call(synthesize, data, mode="full",
+                                    num_predict=4096)
     except Exception as e:  # noqa: BLE001
         logger.exception("doc summary failed")
         await status.edit_text(f"❌ Couldn't summarize the {kind}. {user_message(e)}")
@@ -298,7 +319,7 @@ async def _handle_pdf(update, status, data):
 async def _handle_learning(update, status, article_text, article_url):
     prompt = build_learning_json_prompt(article_text, article_url)
     try:
-        entry = synthesize_json(prompt, num_predict=800)
+        entry = await _model_call(synthesize_json, prompt, num_predict=800)
     except Exception as e:  # noqa: BLE001
         logger.exception("learning json failed")
         await status.edit_text(f"❌ Couldn't build the learning card. {user_message(e)}")
