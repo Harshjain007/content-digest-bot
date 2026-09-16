@@ -99,15 +99,16 @@ cp .env.example .env
 | `ANTHROPIC_MODEL` | defaults to `claude-sonnet-5`. Check `client.models.list()` if a model 404s — old ids like `claude-3-5-sonnet-latest` are no longer available. |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | used when `LLM_PROVIDER=ollama` |
 | `INSTAGRAM_USERNAME` / `PASSWORD` | optional; without them the bot asks you to paste a reel's caption |
+| `ALLOWED_CHAT_IDS` | Telegram chat ids allowed to use the bot, comma-separated. Unset means nobody — the bot refuses everyone rather than failing open. |
 | `MAX_INPUT_CHARS` | hard cap on the Markdown sent to the model, in characters (default 30000). This is the token dial — roughly 4 chars per token. |
 
 `.env` holds live secrets and is git-ignored. Never commit it — `.env.example`
 is the template to share.
 
 ### 4. Authorize yourself
-The bot is private. `ALLOWED_CHAT_IDS` in `content_digest_bot/bot.py` lists the
-Telegram chat IDs allowed to use it; everyone else is refused. Add your own ID
-there before running.
+The bot is private. Put your Telegram chat id in `ALLOWED_CHAT_IDS` in `.env`;
+everyone else is refused, and an unset value refuses everyone. It lives in
+`.env` rather than in the source because the source is published.
 
 ### 5. Run
 
@@ -202,7 +203,10 @@ them to the `gh-pages` branch with a descriptive message
 redeploys within ~1 minute.
 
 - **Live URL:** https://harshjain007.github.io/content-digest-bot/site/index.html
-- Source branch: `gh-pages` (root). Managed by `store._publish_to_pages()`.
+- Source branch: `gh-pages` (root). Managed by `store._publish_to_pages()`,
+  which publishes **only** `site/` and `data/`. It used to push the whole
+  branch, which meant Pages served every module as a downloadable file — so
+  making the repo private would not have made the code private.
 - The Mac must be on (and the bot running) for a new save to publish — Pages
   only updates when the bot pushes.
 - The repo is **public** so the URL works without login. Make it private from
