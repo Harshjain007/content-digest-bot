@@ -276,6 +276,18 @@
     "_added": "2026-09-16T03:44:46.010731+00:00"
   },
   {
+    "title": "Claude Code",
+    "description": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps developers code faster by executing routine tasks, explaining complex code, and handling git workflows through natural language commands. It can be used in the terminal, in an IDE, or invoked on GitHub by tagging @claude, and includes support for extensible plugins that add custom commands and agents.",
+    "problem": "Coding involves many repetitive and time-consuming tasks such as writing boilerplate, understanding unfamiliar or complex codebases, and managing git workflows (commits, branches, merges, etc.). Claude Code solves this by acting as an AI agent that understands the full context of a codebase and can execute these routine tasks, explain code, and manage git operations using plain natural language, reducing manual effort and speeding up development.",
+    "how this works": "1. Install Claude Code using one of the recommended methods: on MacOS/Linux run 'curl -fsSL https://claude.ai/install.sh | bash' or use Homebrew with 'brew install --cask claude-code'; on Windows run 'irm https://claude.ai/install.ps1 | iex' or use WinGet with 'winget install Anthropic.ClaudeCode'. (NPM installation via '@anthropic-ai/claude-code' is deprecated but still available.)\n2. Navigate to your project directory in the terminal.\n3. Run the command 'claude' to start using the tool interactively.\n4. Use natural language commands to ask Claude Code to explain code, perform coding tasks, or manage git workflows.\n5. Optionally, extend functionality using plugins found in the plugins directory of the repository.\n6. Use the '/bug' command within Claude Code to report issues, or file a GitHub issue directly.\n7. Join the Claude Developers Discord for community support and discussions.",
+    "links": {
+      "github": "https://github.com/anthropics/claude-code",
+      "website": "https://code.claude.com/docs/en/overview",
+      "article": ""
+    },
+    "_added": "2026-09-18T09:53:35.090979+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
