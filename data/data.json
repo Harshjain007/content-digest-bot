@@ -288,6 +288,18 @@
     "_added": "2026-09-18T09:53:35.090979+00:00"
   },
   {
+    "title": "AutoShorts",
+    "description": "AutoShorts is a local-first desktop application built with Tauri 2, React, TSX, Rust, and SQLite that transforms long-form video or audio recordings into high-impact, vertical short-form clip candidates (9:16 portrait). It uses AI-powered viral moment ranking through multi-LLM support (DeepSeek or Claude), automatically transcribing content via Deepgram, analyzing and ranking the best moments, and auto-cropping landscape footage into vertical clips using native ffmpeg integration.",
+    "problem": "Creating short-form vertical content from long recordings is time-consuming and requires manually reviewing footage to find engaging moments, transcribing audio, and cropping/formatting video for platforms like TikTok, Reels, or Shorts. AutoShorts automates this entire pipeline locally—importing media, extracting audio, transcribing it, using AI to detect and rank viral-worthy moments, and auto-cropping to portrait format—saving creators significant time while keeping data storage local and private via SQLite.",
+    "how this works": "1. Install prerequisites: FFmpeg and FFprobe must be installed and added to your system PATH (via Homebrew on macOS, Winget on Windows, or apt/pacman/dnf on Linux). 2. Download the appropriate installer for your OS from GitHub Releases (.dmg for macOS, .msi/.exe for Windows, .deb/.AppImage for Linux) and install/run it, bypassing OS security warnings as needed. 3. On first launch, complete the Onboarding Wizard by choosing either: (A) Fully Offline mode—set up Ollama with a local model (llama3.2 3B, qwen2.5 3B/7B) and install local Whisper via 'pip3 install openai-whisper', or (B) Cloud API mode—enter API keys for Deepgram (transcription), DeepSeek (recommended for moment detection), and/or Claude (premium copywriting/hooks). 4. Use the dashboard to create/open/rename/delete projects, import media, and let the automated pipeline extract audio, transcribe, and rank viral moments. 5. Adjust settings anytime via the API Settings gear icon, or reset onboarding to switch between offline and cloud modes. For developers: copy .env.example to .env, fill in DEEPGRAM_API_KEY, DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, and set LLM_PROVIDER, then run 'npm install' and 'npm run tauri:dev' for development, or 'npm run tauri:build' to produce packaged installers under src-tauri/target/release/bundle/.",
+    "links": {
+      "github": "https://github.com/JayWebtech/autoshorts",
+      "website": "",
+      "article": ""
+    },
+    "_added": "2026-09-30T08:23:02.427772+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
