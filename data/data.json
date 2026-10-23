@@ -312,6 +312,18 @@
     "_added": "2026-10-14T12:58:40.427667+00:00"
   },
   {
+    "title": "/brag",
+    "description": "/brag is an agent skill that turns a project you've built into a short, shareable launch video — complete with music, motion, and share copy — using a single command. It works with Claude Code, Codex, opencode, and other agents supporting Agent Skills, and is powered by Hyperframes for video generation. A lean variant, /brag-slim, is also available, designed for Opus 5.5, which produces a launch video with its own soundtrack and share copy without relying on Hyperframes or bundled assets. For those who don't want to run it themselves, letsbrag.app lets users paste a site link to generate a 20-second launch video with no setup required.",
+    "problem": "Developers who build projects often struggle to effectively market or showcase their work in an engaging, shareable format. Creating a polished launch video typically requires video editing skills, music licensing, motion design, and marketing copywriting — a time-consuming and skill-intensive process. /brag automates this entire pipeline: it understands your project, decides on tone and angle, selects which moments to highlight, and hands off to Hyperframes to render a finished video, removing the barrier between 'I built something' and 'I can show it off.'",
+    "how this works": "1. Install the skill for your agent: for Codex use `codex plugin marketplace add latent-spaces/brag` then `codex plugin add brag@brag`; for Claude Code use `/plugin marketplace add latent-spaces/brag` then `/plugin install brag@brag`; for other agents (Cursor, Copilot, Gemini CLI, opencode, etc.) run `npx skills add https://github.com/latent-spaces/brag --skill brag` (add `-g` for global install). 2. Ensure requirements are met: an agent supporting Agent Skills, Node.js 22+, FFmpeg on PATH, and the Hyperframes CLI (`npx hyperframes`, verify with `npx hyperframes doctor`). 3. From your project directory, tell your agent `let's /brag` (optionally steer tone with `/brag --tone \"...\"` or enable narration with `/brag --voice`). 4. On Claude Opus 5.5, /brag automatically switches to the lightweight /brag-slim mode; run `/brag --full` to force the classic Hyperframes workflow, or install /brag-slim alone via `npx skills add https://github.com/latent-spaces/brag --skill brag-slim`. 5. The tool outputs a `brag-output/` folder containing the plan, a composition brief, share copy, and the rendered `brag.mp4`. Alternatively, skip local setup entirely by pasting your project's site link at letsbrag.app to get a generated video without installing anything.",
+    "links": {
+      "github": "https://github.com/latent-spaces/brag",
+      "website": "https://latent-spaces.github.io/brag/",
+      "article": ""
+    },
+    "_added": "2026-10-23T18:38:32.505688+00:00"
+  },
+  {
     "description": "This article provides a collection of free resources and guides for AI workflow optimization, productivity, and self-improvement. It includes tools for cloning websites, automating job applications, building mobile apps, creating AI-powered chatbots, and enhancing coding practices through structured frameworks and templates.",
     "links": {
       "article": "https://www.aiburnerofficial.com/resources/"
